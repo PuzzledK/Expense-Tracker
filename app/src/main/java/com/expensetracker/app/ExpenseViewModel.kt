@@ -62,6 +62,7 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
+        Predictor.init(app)
         reload()
         LocationTagger.backfillAsync(app) { reload() }
     }
@@ -102,10 +103,11 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun add(e: Expense) {
+    /** [payee]: for confirmed auto-captured payments, so the model learns payee → your note. */
+    fun add(e: Expense, payee: String? = null) {
         var id = 0L
         write({ id = db.insert(e.copy(id = 0)) }) {
-            Predictor.learn(e.copy(id = id))
+            Predictor.learn(e.copy(id = id), payee)
             autoTag(listOf(e), listOf(id))
         }
     }
@@ -212,23 +214,40 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun dupKey(e: Expense) = "${e.date}|${e.amountPaise}|${e.isIncome}|${noteKey(e.note)}"
 
-    fun exportJson(): String = BackupIo.toJson(_expenses.value, _settings.value)
+    fun exportJson(): String = com.expensetracker.app.backup.BackupData.toJson(getApplication(), _expenses.value, _settings.value)
     fun exportCsv(): String = BackupIo.toCsv(_expenses.value)
     fun exportNotesText(): String = BackupIo.toNotesText(_expenses.value)
 
     fun restoreJson(json: String, replaceExisting: Boolean, onDone: (Int) -> Unit) {
-        val (list, restoredSettings) = try {
-            BackupIo.fromJson(json)
+        // Restores entries, plus the backup's categories and goals; Merge skips exact duplicates.
+        val content = try {
+            BackupIo.parse(json)
         } catch (t: Throwable) {
             onDone(-1)
             return
         }
+        var inserted = 0
         write({
-            if (replaceExisting) db.deleteAll()
-            db.insertAll(list.map { it.copy(id = 0) })
+            // Categories first so entries in custom categories keep them.
+            com.expensetracker.app.backup.BackupData.applyExtras(getApplication(), content, replaceExisting)
+            val toInsert = if (replaceExisting) {
+                db.deleteAll()
+                content.expenses
+            } else {
+                val existing = HashMap<String, Int>()
+                db.all().forEach { existing.merge(dupKey(it), 1, Int::plus) }
+                content.expenses.filter { e ->
+                    val n = existing[dupKey(e)] ?: 0
+                    if (n > 0) existing[dupKey(e)] = n - 1
+                    n == 0
+                }
+            }
+            db.insertAll(toInsert.map { it.copy(id = 0) })
+            inserted = toInsert.size
         }) {
-            if (restoredSettings != null && replaceExisting) updateSettings { restoredSettings }
-            onDone(list.size)
+            // Only the settings a backup carries (budget, reminder, home city); device ones stay.
+            content.settingsPatch?.let { patch -> if (replaceExisting) updateSettings(patch) }
+            onDone(inserted)
         }
     }
 

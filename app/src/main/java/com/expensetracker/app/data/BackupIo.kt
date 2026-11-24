@@ -7,11 +7,31 @@ import java.time.LocalDate
  */
 object BackupIo {
 
-    private const val VERSION = 1
+    private const val VERSION = 2
+
+    /** Everything a JSON backup carries. [categories]/[goalsText] are null for backups made before they existed. */
+    class Content(
+        val expenses: List<Expense>,
+        /** Applies the backed-up settings onto the current ones (only keys present in the file); null = none. */
+        val settingsPatch: ((Settings) -> Settings)?,
+        /** Edited built-ins and custom categories (see [CategoryRegistry.encode]); null = not in this backup. */
+        val categories: List<CategoryInfo>?,
+        /** Opaque text from GoalStore.exportText; null = not in this backup. */
+        val goalsText: String?,
+    )
 
     // ---------------- JSON ----------------
 
-    fun toJson(expenses: List<Expense>, settings: Settings): String = buildString {
+    /**
+     * [categories] = edited built-ins + custom categories (as stored by [CategoryRegistry]);
+     * [goalsText] = GoalStore.exportText. Both optional so older callers keep working.
+     */
+    fun toJson(
+        expenses: List<Expense>,
+        settings: Settings,
+        categories: List<CategoryInfo>? = null,
+        goalsText: String? = null,
+    ): String = buildString {
         append("{\n  \"app\": \"ExpenseTracker\",\n  \"version\": ").append(VERSION).append(",\n")
         append("  \"settings\": {")
         append("\"monthlyBudgetPaise\": ").append(settings.monthlyBudgetPaise)
@@ -19,7 +39,11 @@ object BackupIo {
         append(", \"reminderEnabled\": ").append(settings.reminderEnabled)
         append(", \"reminderHour\": ").append(settings.reminderHour)
         append(", \"reminderMinute\": ").append(settings.reminderMinute)
-        append("},\n  \"expenses\": [")
+        append(", \"homeCity\": ").append(quote(settings.homeCity))
+        append("},\n")
+        if (categories != null) append("  \"categories\": ").append(quote(CategoryRegistry.encode(categories))).append(",\n")
+        if (goalsText != null) append("  \"goals\": ").append(quote(goalsText)).append(",\n")
+        append("  \"expenses\": [")
         expenses.forEachIndexed { i, e ->
             append(if (i == 0) "\n    " else ",\n    ")
             append("{\"date\": ").append(quote(e.date.toString()))
@@ -31,7 +55,7 @@ object BackupIo {
             e.spendOverride?.let { append(", \"spendOverride\": ").append(quote(it.name)) }
             e.place?.let { append(", \"place\": ").append(quote(it)) }
             e.goalId?.let { append(", \"goalId\": ").append(quote(it)) }
-            e.time?.let { append(", \"time\": ").append(quote("%02d:%02d".format(it.hour, it.minute))) }
+            e.time?.let { append(", \"time\": ").append(quote(String.format(java.util.Locale.ROOT, "%02d:%02d", it.hour, it.minute))) }
             if (e.lat != null && e.lon != null) append(", \"lat\": ").append(e.lat).append(", \"lon\": ").append(e.lon)
             append("}")
         }
@@ -39,12 +63,26 @@ object BackupIo {
         append("]\n}\n")
     }
 
-    /** Ids are reset to 0. Throws IllegalArgumentException on malformed input. */
+    /** Ids are reset to 0. Throws IllegalArgumentException on malformed input. Kept for old callers; see [parse]. */
     fun fromJson(json: String): Pair<List<Expense>, Settings?> {
+        val c = parse(json)
+        return c.expenses to c.settingsPatch?.invoke(Settings())
+    }
+
+    /**
+     * Full parse. Entries in a custom category carried by the same backup keep that category even
+     * if it doesn't exist on this phone yet (apply [Content.categories] before inserting them).
+     * Throws IllegalArgumentException on malformed input.
+     */
+    fun parse(json: String): Content {
         val root = JsonReader(json).readRoot() as? Map<*, *>
             ?: throw IllegalArgumentException("Backup file is not a JSON object")
         val list = root["expenses"] as? List<*>
             ?: throw IllegalArgumentException("Backup file has no \"expenses\" list")
+        val categories = (root["categories"] as? String)?.let { CategoryRegistry.decode(it) }
+        val backupIds = categories?.map { it.id }?.toSet().orEmpty()
+        fun category(id: String?): Category =
+            if (id != null && id in backupIds && id !in CategoryRegistry.DEFAULTS) Category.create(id) else Category.fromId(id)
         val expenses = list.mapIndexed { i, item ->
             val o = item as? Map<*, *> ?: throw IllegalArgumentException("Expense #${i + 1} is not an object")
             Expense(
@@ -52,8 +90,7 @@ object BackupIo {
                 amountPaise = (o["amountPaise"] as? Number)?.toLong()
                     ?: throw IllegalArgumentException("Expense #${i + 1} has no amount"),
                 note = o["note"] as? String ?: "",
-                category = (o["category"] as? String)
-                    .let { Category.fromId(it) },
+                category = category(o["category"] as? String),
                 date = (o["date"] as? String)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                     ?: throw IllegalArgumentException("Expense #${i + 1} has no valid date"),
                 isIncome = o["isIncome"] as? Boolean ?: false,
@@ -67,17 +104,19 @@ object BackupIo {
                 time = (o["time"] as? String)?.let { runCatching { java.time.LocalTime.parse(it) }.getOrNull() },
             )
         }
-        val settings = (root["settings"] as? Map<*, *>)?.let { s ->
-            val d = Settings()
-            Settings(
-                monthlyBudgetPaise = (s["monthlyBudgetPaise"] as? Number)?.toLong() ?: d.monthlyBudgetPaise,
-                excludeSavingsFromSpend = s["excludeSavingsFromSpend"] as? Boolean ?: d.excludeSavingsFromSpend,
-                reminderEnabled = s["reminderEnabled"] as? Boolean ?: d.reminderEnabled,
-                reminderHour = (s["reminderHour"] as? Number)?.toInt() ?: d.reminderHour,
-                reminderMinute = (s["reminderMinute"] as? Number)?.toInt() ?: d.reminderMinute,
-            )
+        val settingsPatch: ((Settings) -> Settings)? = (root["settings"] as? Map<*, *>)?.let { s ->
+            { cur: Settings ->
+                cur.copy(
+                    monthlyBudgetPaise = (s["monthlyBudgetPaise"] as? Number)?.toLong() ?: cur.monthlyBudgetPaise,
+                    excludeSavingsFromSpend = s["excludeSavingsFromSpend"] as? Boolean ?: cur.excludeSavingsFromSpend,
+                    reminderEnabled = s["reminderEnabled"] as? Boolean ?: cur.reminderEnabled,
+                    reminderHour = (s["reminderHour"] as? Number)?.toInt() ?: cur.reminderHour,
+                    reminderMinute = (s["reminderMinute"] as? Number)?.toInt() ?: cur.reminderMinute,
+                    homeCity = s["homeCity"] as? String ?: cur.homeCity,
+                )
+            }
         }
-        return expenses to settings
+        return Content(expenses, settingsPatch, categories, root["goals"] as? String)
     }
 
     private fun quote(s: String): String = buildString {
