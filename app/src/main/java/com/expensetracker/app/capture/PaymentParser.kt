@@ -81,7 +81,7 @@ object PaymentParser {
     private const val NUM = """([0-9][0-9,]*(?:\.[0-9]{1,2})?)"""
 
     /** "₹1,200.50", "Rs.142", "INR 500", "Rs 1,23,456.00", also "142.00 INR". */
-    private val amountRe = Regex("""$CUR\s*$NUM|(?<![\w*/.:-])$NUM\s*(?:/-\s*)?(?:₹|\brs\b\.?|\binr\b)""", RegexOption.IGNORE_CASE)
+    private val amountRe = Regex("""$CUR\s*$NUM|(?<![\w*/.:-])$NUM[ \t]*(?:/-[ \t]*)?(?:₹|\brs\b\.?|\binr\b)""", RegexOption.IGNORE_CASE)
     /** SBI-style "debited by 142.0" with no currency. */
     private val bareAmountRe = Regex("""\b(?:debited|credited)\s+(?:by|with|for)\s+$NUM""", RegexOption.IGNORE_CASE)
 
@@ -147,7 +147,9 @@ object PaymentParser {
         val t = title.orEmpty().trim()
         val body = text.orEmpty().trim()
         if (body.isEmpty() && t.isEmpty()) return null
-        val all = (if (t.isNotEmpty() && !body.contains(t, ignoreCase = true)) "$t\n$body" else body)
+        // A title that is just a phone number / short code (SMS sender) carries no payment info.
+        val titleUseful = t.isNotEmpty() && !Regex("""^\+?[\d\s-]{3,15}$""").matches(t)
+        val all = (if (titleUseful && !body.contains(t, ignoreCase = true)) "$t\n$body" else body)
             .replace(' ', ' ')
             .replace(Regex("[ \t]+"), " ")
 

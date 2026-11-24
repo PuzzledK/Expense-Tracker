@@ -2,6 +2,8 @@
 
 package com.expensetracker.app.capture
 
+import androidx.compose.material3.SwipeToDismissBoxValue
+
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -439,9 +441,10 @@ private fun SwipeableDraft(
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         onDismiss = { onDismiss() },
         backgroundContent = {
+            if (state.dismissDirection == SwipeToDismissBoxValue.Settled) return@SwipeToDismissBox
             Box(
                 Modifier.fillMaxSize()
-                    .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer, MaterialTheme.shapes.large)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {

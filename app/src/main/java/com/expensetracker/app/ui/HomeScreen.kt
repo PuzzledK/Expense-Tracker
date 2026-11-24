@@ -2,6 +2,9 @@
 
 package com.expensetracker.app.ui
 
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.foundation.lazy.rememberLazyListState
+
 import com.expensetracker.app.ui.kit.themedSurface
 
 import androidx.compose.ui.unit.sp
@@ -164,6 +167,9 @@ fun HomeScreen(
         }
     }
 
+    val listState = rememberLazyListState()
+    val scrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -206,10 +212,12 @@ fun HomeScreen(
                 SmallFloatingActionButton(
                     onClick = { onBulkAdd(if (month == YearMonth.from(today)) today else month.atEndOfMonth()) },
                 ) {
-                    Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Add multiple", style = MaterialTheme.typography.labelLarge)
+                    Row(Modifier.padding(horizontal = 12.dp).animateContentSize(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Add multiple", Modifier.size(18.dp))
+                        if (!scrolled) {
+                            Spacer(Modifier.width(6.dp))
+                            Text("Add multiple", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -219,8 +227,9 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(bottom = 88.dp),
+            contentPadding = PaddingValues(bottom = 160.dp),
         ) {
             if (searching && q.isNotEmpty()) {
                 item("search-summary") {
@@ -371,7 +380,7 @@ private fun SummaryCard(all: List<Expense>, month: YearMonth, settings: Settings
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 if (isCurrent) StatPill("Today", formatRupees(todaySpent), Modifier.weight(1f))
-                StatPill("Everyday / day", formatRupees(if (daysElapsed > 0) split.everyday / daysElapsed else 0), Modifier.weight(1f))
+                StatPill("Everyday / day", formatRupeesWhole(if (daysElapsed > 0) split.everyday / daysElapsed else 0), Modifier.weight(1f))
                 if (income > 0) StatPill("Received", "+" + formatRupees(income), Modifier.weight(1f))
                 else if (saved > 0) StatPill("Saved", formatRupees(saved), Modifier.weight(1f))
             }
@@ -404,7 +413,7 @@ private fun SummaryCard(all: List<Expense>, month: YearMonth, settings: Settings
                     "Over budget by ${formatRupees(-left)} (budget ${formatRupees(budget)})"
                 } else if (isCurrent) {
                     val daysLeft = month.lengthOfMonth() - today.dayOfMonth + 1
-                    "${formatRupees(left)} left · ${formatRupees(left / daysLeft)}/day for $daysLeft days"
+                    "${formatRupees(left)} left · ${formatRupeesWhole(left / daysLeft)}/day for $daysLeft days"
                 } else {
                     "${formatRupees(left)} under budget of ${formatRupees(budget)}"
                 }

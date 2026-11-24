@@ -136,7 +136,7 @@ fun StatsScreen(
             // Headline numbers
             Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatTile("Spent", formatRupees(total), Modifier.weight(1f))
-                StatTile("Everyday/day", formatRupees(everydayPerDay), Modifier.weight(1f))
+                StatTile("Everyday/day", formatRupeesWhole(everydayPerDay), Modifier.weight(1f))
                 val change = if (prevTotal > 0) ((total - prevTotal) * 100.0 / prevTotal).roundToInt() else null
                 StatTile(
                     "vs ${formatMonthShort(month.minusMonths(1))}",
@@ -241,14 +241,13 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     val style = LocalAppStyle.current
     Card(modifier) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text(
+            FitText(
                 if (style.capsLabels) label.uppercase() else label,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
             )
             Spacer(Modifier.height(2.dp))
-            Text(value, style = style.money(MaterialTheme.typography.titleLarge), color = valueColor, maxLines = 1)
+            FitText(value, style = style.money(MaterialTheme.typography.titleLarge), color = valueColor)
         }
     }
 }
@@ -363,7 +362,7 @@ private fun DailyBars(daily: LongArray, month: YearMonth, avg: Long) {
         Text("${daily.size}", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
     }
     Text(
-        "— line = everyday average ${formatRupees(avg)}/day · everyday spending only, one-offs listed above",
+        "— line = everyday average ${formatRupeesWhole(avg)}/day · everyday spending only, one-offs listed above",
         style = MaterialTheme.typography.labelSmall,
         color = avgColor,
     )
@@ -468,7 +467,7 @@ private fun SpendSplitView(split: SpendSplit, savings: Long, typicalDay: Long, e
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f)) {
             Text("Everyday avg", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${formatRupees(everydayPerDay)}/day", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("${formatRupeesWhole(everydayPerDay)}/day", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.weight(1f)) {
             Text("Typical day", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -600,7 +599,7 @@ private fun TripRow(trip: com.expensetracker.app.data.Trip, onEdit: (Expense) ->
             Column(Modifier.weight(1f)) {
                 Text("✈️ ${trip.title}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    "$range · ${trip.days} day${if (trip.days == 1) "" else "s"} · ${formatRupees(trip.totalPaise / trip.days)}/day",
+                    "$range · ${trip.days} day${if (trip.days == 1) "" else "s"} · ${formatRupeesWhole(trip.totalPaise / trip.days)}/day",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

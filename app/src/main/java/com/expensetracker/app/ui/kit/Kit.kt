@@ -1,5 +1,7 @@
 package com.expensetracker.app.ui.kit
 
+import androidx.compose.foundation.layout.Spacer
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -271,6 +273,31 @@ fun SmallFloatingActionButton(onClick: () -> Unit, modifier: Modifier = Modifier
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         content = content,
     )
+}
+
+@Composable
+fun ExtendedFloatingActionButton(
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+    text: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = LocalAppStyle.current
+    if (s.isBrutal) {
+        BrutalFab(onClick, modifier, null, s.accent(0)) {
+            Row(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                icon()
+                Spacer(Modifier.size(10.dp))
+                ProvideTextStyle(MaterialTheme.typography.labelLarge) { text() }
+            }
+        }
+    } else {
+        androidx.compose.material3.ExtendedFloatingActionButton(
+            onClick = onClick, icon = icon, text = text, modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        )
+    }
 }
 
 // ------------------------------------------------------------------ Top bar

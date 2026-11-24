@@ -61,4 +61,17 @@ class BankOfBarodaSmsTest {
         assertFalse(r!!.isCredit)
         assertEquals(50000L, r.amountPaise)
     }
+
+    @Test fun numericSenderIsNotAnAmount() {
+        // Found on the emulator: sender "5003" + "Rs.249.00 …" was read as ₹5,003.
+        for (sender in listOf("5003", "56767", "+919876543210", "VM-BOBTXN")) {
+            val r = sms("Rs.249.00 Dr. from A/C XXXXXX6932 and Cr. to zomato@hdfcbank. Ref:669540407777. AvlBal:Rs19502.64(2026:11:25 14:30:00). Not you? Call 18005700/5000-BOB", title = sender)
+            assertEquals("sender $sender", 24900L, r!!.amountPaise)
+        }
+    }
+
+    @Test fun amountBeforeCurrencyStillWorksOnOneLine() {
+        val r = PaymentParser.parse("HDFC Bank", "500 Rs debited from A/c XX1234 to rapido@ybl", requireBankContext = true)
+        assertEquals(50000L, r!!.amountPaise)
+    }
 }

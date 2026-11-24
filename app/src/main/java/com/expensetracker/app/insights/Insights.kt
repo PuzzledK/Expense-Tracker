@@ -187,7 +187,7 @@ fun InsightsCard(vm: ExpenseViewModel, onOpen: () -> Unit) {
     if (top.isEmpty()) return
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable(onClick = onOpen),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)),
+        colors = if (com.expensetracker.app.ui.LocalAppStyle.current.isBrutal) null else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)),
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row {

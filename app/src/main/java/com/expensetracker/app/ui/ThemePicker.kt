@@ -79,13 +79,20 @@ private fun ThemePreviewCard(theme: AppThemeId, dark: Boolean, selected: Boolean
     val (scheme, style) = previewColors(theme, dark, ctx)
     val shape = RoundedCornerShape(if (style.isBrutal) 6.dp else 18.dp)
     val ring = MaterialTheme.colorScheme.primary
-    Column(Modifier.width(128.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    // The whole tile (preview + name) is the tap target.
+    Column(
+        Modifier
+            .width(128.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Box(
             Modifier
                 .padding(end = style.hardShadow, bottom = style.hardShadow)
                 .then(if (selected) Modifier.border(3.dp, ring, shape).padding(5.dp) else Modifier.padding(5.dp))
                 .themedSurface(shape, scheme.background, style)
-                .clickable(onClick = onClick)
                 .width(112.dp)
                 .height(150.dp),
         ) {
@@ -94,14 +101,14 @@ private fun ThemePreviewCard(theme: AppThemeId, dark: Boolean, selected: Boolean
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .height(56.dp)
                         .themedSurface(RoundedCornerShape(if (style.isBrutal) 4.dp else 12.dp), style.hero, style.copy(hardShadow = if (style.isBrutal) 2.dp else 0.dp, borderWidth = if (style.isBrutal) 1.5.dp else 0.dp)),
                 ) {
                     Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
-                        Text("SPENT", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = style.onHero.copy(alpha = 0.8f))
+                        Text("SPENT", fontSize = 7.sp, lineHeight = 9.sp, fontWeight = FontWeight.Bold, color = style.onHero.copy(alpha = 0.8f))
                         Text(
                             "₹12,340",
-                            style = style.money(MaterialTheme.typography.titleMedium).copy(fontSize = 15.sp),
+                            style = style.money(MaterialTheme.typography.titleMedium).copy(fontSize = 14.sp, lineHeight = 18.sp),
                             color = style.onHero,
                             maxLines = 1,
                         )

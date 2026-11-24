@@ -1,5 +1,9 @@
 package com.expensetracker.app.ui
 
+import androidx.compose.runtime.setValue
+
+import androidx.compose.runtime.getValue
+
 import com.expensetracker.app.data.Category
 import com.expensetracker.app.data.Expense
 import com.expensetracker.app.data.SpendInfo
@@ -35,6 +39,29 @@ fun formatRupees(paise: Long, withSymbol: Boolean = true): String {
     val body = groupIndian(rupees) + if (frac != 0L) "." + frac.toString().padStart(2, '0') else ""
     return (if (neg) "-" else "") + (if (withSymbol) "₹" else "") + body
 }
+
+/** One line of text that shrinks (down to 60%) to fit its width instead of being cut off. */
+@androidx.compose.runtime.Composable
+fun FitText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    color: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+) {
+    var scale by androidx.compose.runtime.saveable.rememberSaveable(text) { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    androidx.compose.material3.Text(
+        text,
+        style = style.copy(fontSize = style.fontSize * scale, lineHeight = style.lineHeight * scale),
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier,
+        onTextLayout = { r -> if (r.hasVisualOverflow && scale > 0.6f) scale -= 0.08f },
+    )
+}
+
+/** Averages and per-day figures: rounded to whole rupees (₹96, not ₹96.12). */
+fun formatRupeesWhole(paise: Long): String = formatRupees(Math.round(paise / 100.0) * 100)
 
 /** Compact form for chart labels: ₹1.2L, ₹12k, ₹950. */
 fun formatRupeesShort(paise: Long): String {
