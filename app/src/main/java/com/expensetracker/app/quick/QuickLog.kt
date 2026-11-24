@@ -66,6 +66,7 @@ object QuickLog {
      * Blocking: call from a background thread. Returns what was saved (empty if nothing parsed).
      */
     fun log(ctx: Context, text: String, date: LocalDate = LocalDate.now()): List<Expense> {
+        Predictor.init(ctx)
         val db = ExpenseDb(ctx)
         val all = db.all()
         val now = System.currentTimeMillis()

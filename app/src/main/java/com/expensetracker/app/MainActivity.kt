@@ -25,6 +25,8 @@ class MainActivity : ComponentActivity() {
     private val openAddRequests = mutableIntStateOf(0)
     /** Same for the "Add multiple" sheet (notification action / widget ≡ button). */
     private val openBulkRequests = mutableIntStateOf(0)
+    /** Feature screen a notification wants opened (capture review, backup settings). */
+    private val overlayRequest = androidx.compose.runtime.mutableStateOf<com.expensetracker.app.ui.Overlay?>(null)
     private val vm: ExpenseViewModel by viewModels()
     /** Phone-unlock gate; registered here because it needs an activity-result launcher. */
     val appLock = AppLockController(this)
@@ -34,6 +36,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
         appLock.onCreate()
+        // Force-stop clears alarms; re-arm scheduled backups and the weekly summary on every launch.
+        com.expensetracker.app.backup.AutoBackup.restore(this)
+        com.expensetracker.app.insights.Insights.restore(this)
         setContent {
             ExpenseTheme {
                 val all by vm.expenses.collectAsStateWithLifecycle()
@@ -43,7 +48,13 @@ class MainActivity : ComponentActivity() {
                     if (appLock.locked) {
                         LockScreen(onUnlock = appLock::unlock)
                     } else {
-                        ExpenseApp(vm = vm, openAddRequests = openAddRequests.intValue, openBulkRequests = openBulkRequests.intValue)
+                        ExpenseApp(
+                            vm = vm,
+                            openAddRequests = openAddRequests.intValue,
+                            openBulkRequests = openBulkRequests.intValue,
+                            overlayRequest = overlayRequest.value,
+                            onOverlayRequestHandled = { overlayRequest.value = null },
+                        )
                     }
                 }
             }
@@ -58,11 +69,14 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         appLock.onStop()
+        // Backs up on a background thread only if one is overdue.
+        com.expensetracker.app.backup.AutoBackup.onAppBackground(this)
     }
 
     override fun onResume() {
         super.onResume()
         vm.reload()
+        com.expensetracker.app.capture.CaptureStore.refresh(this)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -79,6 +93,14 @@ class MainActivity : ComponentActivity() {
         if (intent.action == ACTION_ADD || flag == true || flag == "true") {
             openAddRequests.intValue++
             intent.removeExtra(EXTRA_OPEN_ADD)
+        }
+        if (intent.getBooleanExtra(com.expensetracker.app.capture.CaptureNotifier.EXTRA_OPEN_CAPTURE, false)) {
+            overlayRequest.value = com.expensetracker.app.ui.Overlay.CAPTURE
+            intent.removeExtra(com.expensetracker.app.capture.CaptureNotifier.EXTRA_OPEN_CAPTURE)
+        }
+        if (intent.getBooleanExtra(com.expensetracker.app.backup.AutoBackup.EXTRA_OPEN_BACKUP, false)) {
+            overlayRequest.value = com.expensetracker.app.ui.Overlay.BACKUP
+            intent.removeExtra(com.expensetracker.app.backup.AutoBackup.EXTRA_OPEN_BACKUP)
         }
         if (intent.getBooleanExtra(EXTRA_OPEN_BULK, false)) {
             openBulkRequests.intValue++

@@ -54,7 +54,14 @@ sealed interface SheetState {
 }
 
 @Composable
-fun ExpenseApp(vm: ExpenseViewModel, openAddRequests: Int, openBulkRequests: Int = 0) {
+fun ExpenseApp(
+    vm: ExpenseViewModel,
+    openAddRequests: Int,
+    openBulkRequests: Int = 0,
+    /** A notification asked to open this screen; call [onOverlayRequestHandled] once shown. */
+    overlayRequest: Overlay? = null,
+    onOverlayRequestHandled: () -> Unit = {},
+) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var showImport by rememberSaveable { mutableStateOf(false) }
     var overlay by rememberSaveable { mutableStateOf<Overlay?>(null) }
@@ -82,6 +89,14 @@ fun ExpenseApp(vm: ExpenseViewModel, openAddRequests: Int, openBulkRequests: Int
             tab = Tab.HOME
             showImport = false
             sheet = SheetState.Adding
+        }
+    }
+
+    LaunchedEffect(overlayRequest) {
+        if (overlayRequest != null) {
+            showImport = false
+            overlay = overlayRequest
+            onOverlayRequestHandled()
         }
     }
 
