@@ -154,7 +154,18 @@ internal object CapturePrefs {
 }
 
 /** Declared in the manifest; needs the user to grant notification access. */
+/** Debug-build logging switch for the listener (release builds stay quiet). */
+internal object BuildConfigDebug { @JvmField var on = false }
+
+private const val TAG = "PaymentListener"
+
 class PaymentListenerService : NotificationListenerService() {
+
+    override fun onListenerConnected() {
+        BuildConfigDebug.on = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (BuildConfigDebug.on) Log.d(TAG, "listener connected")
+    }
+
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         try {
@@ -166,21 +177,26 @@ class PaymentListenerService : NotificationListenerService() {
 
     private fun handle(sbn: StatusBarNotification) {
         val ctx = applicationContext
-        if (!CapturePrefs.captureEnabled(ctx)) return
+        fun skip(why: String) { if (Log.isLoggable(TAG, Log.DEBUG) || BuildConfigDebug.on) Log.d(TAG, "skip ${sbn.packageName}: $why") }
+        if (!CapturePrefs.captureEnabled(ctx)) return skip("capture off")
         val pkg = sbn.packageName ?: return
         if (pkg == ctx.packageName) return
         // Only allow-listed payment/bank apps and SMS apps; everything else is never even read.
         val defaultSms = try { Telephony.Sms.getDefaultSmsPackage(ctx) } catch (_: Exception) { null }
         val source = CaptureSources.of(pkg, defaultSms) ?: return
-        if (!CapturePrefs.appEnabled(ctx, source.group)) return
+        if (!CapturePrefs.appEnabled(ctx, source.group)) return skip("source ${source.group} off")
+        // With SMS access the receiver reads the full SMS; the SMS app's notification would be a
+        // duplicate (and on Android 15+ its text is hidden from us anyway).
+        if (source.group == SourceGroup.SMS && SmsAccess.granted(ctx)) return skip("sms read directly")
 
-        val n = sbn.notification ?: return
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
-        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
-        val ex = n.extras ?: return
+        val n = sbn.notification ?: return skip("no notification")
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return skip("group summary")
+        if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return skip("ongoing")
+        val ex = n.extras ?: return skip("no extras")
         val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString()
-        if (title.isNullOrBlank() && text.isNullOrBlank()) return
+        if (title.isNullOrBlank() && text.isNullOrBlank()) return skip("empty")
+        skip("-> ingest (title=$title, ${text?.length} chars)")
 
         // `when` is the payment/SMS time; fall back to post time if it looks wrong.
         val posted = sbn.postTime

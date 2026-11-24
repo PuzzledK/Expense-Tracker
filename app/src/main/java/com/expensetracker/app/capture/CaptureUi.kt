@@ -306,6 +306,26 @@ private fun CaptureSettingsCard(enabled: Boolean, granted: Boolean, onEnabled: (
                 }
                 OutlinedButton(onClick = onOpenAccess) { Text(if (granted) "Manage" else "Allow") }
             }
+            // Bank SMS: Android 15+ hides their notification text from other apps, so read SMS directly.
+            var smsGranted by remember { mutableStateOf(SmsAccess.granted(ctx)) }
+            val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> smsGranted = ok }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Bank SMS access", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (smsGranted) "Allowed — bank SMS are read directly"
+                        else "Needed on Android 15+, which hides bank SMS from notification readers. Only bank payment messages are kept.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (smsGranted) incomeColor() else if (enabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (!smsGranted) {
+                    OutlinedButton(onClick = { smsLauncher.launch(Manifest.permission.RECEIVE_SMS) }) { Text("Allow") }
+                }
+            }
             SwitchRow(
                 title = "Notify me on capture",
                 subtitle = "A quiet “₹142 to Zomato captured — tap to review”",
