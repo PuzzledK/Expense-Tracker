@@ -23,7 +23,7 @@ import com.expensetracker.app.data.Category
 import com.expensetracker.app.data.Expense
 import com.expensetracker.app.data.ExpenseDb
 import com.expensetracker.app.data.NotesParser
-import com.expensetracker.app.data.learnedCategory
+import com.expensetracker.app.ml.Predictor
 import com.expensetracker.app.location.LocationTagger
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -75,7 +75,7 @@ object QuickLog {
                 Expense(
                     amountPaise = q.amountPaise,
                     note = q.note,
-                    category = learnedCategory(all, q.note),
+                    category = Predictor.also { it.train(all) }.predictCategory(q.note, q.amountPaise, java.time.LocalDateTime.now()),
                     date = date,
                     isIncome = q.isIncome,
                     createdAt = now + i,

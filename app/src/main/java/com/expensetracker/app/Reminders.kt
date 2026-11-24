@@ -99,6 +99,8 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
                 Reminders.rescheduleFromPrefs(context)
                 com.expensetracker.app.quick.QuickLog.restore(context)
+                com.expensetracker.app.backup.AutoBackup.restore(context)
+                com.expensetracker.app.insights.Insights.restore(context)
             }
         }
     }

@@ -30,6 +30,7 @@ object BackupIo {
             append(", \"createdAt\": ").append(e.createdAt)
             e.spendOverride?.let { append(", \"spendOverride\": ").append(quote(it.name)) }
             e.place?.let { append(", \"place\": ").append(quote(it)) }
+            e.goalId?.let { append(", \"goalId\": ").append(quote(it)) }
             e.time?.let { append(", \"time\": ").append(quote("%02d:%02d".format(it.hour, it.minute))) }
             if (e.lat != null && e.lon != null) append(", \"lat\": ").append(e.lat).append(", \"lon\": ").append(e.lon)
             append("}")
@@ -52,8 +53,7 @@ object BackupIo {
                     ?: throw IllegalArgumentException("Expense #${i + 1} has no amount"),
                 note = o["note"] as? String ?: "",
                 category = (o["category"] as? String)
-                    ?.let { name -> Category.entries.firstOrNull { it.name == name } }
-                    ?: Category.OTHER,
+                    .let { Category.fromId(it) },
                 date = (o["date"] as? String)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                     ?: throw IllegalArgumentException("Expense #${i + 1} has no valid date"),
                 isIncome = o["isIncome"] as? Boolean ?: false,
@@ -63,6 +63,7 @@ object BackupIo {
                 place = (o["place"] as? String)?.takeIf { it.isNotBlank() },
                 lat = (o["lat"] as? Number)?.toDouble(),
                 lon = (o["lon"] as? Number)?.toDouble(),
+                goalId = (o["goalId"] as? String)?.takeIf { it.isNotBlank() },
                 time = (o["time"] as? String)?.let { runCatching { java.time.LocalTime.parse(it) }.getOrNull() },
             )
         }

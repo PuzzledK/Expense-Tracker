@@ -19,6 +19,7 @@ import com.expensetracker.app.data.SpendInfo
 import com.expensetracker.app.data.noteKey
 import com.expensetracker.app.data.frequentTemplates
 import com.expensetracker.app.quick.QuickLog
+import com.expensetracker.app.ml.Predictor
 import com.expensetracker.app.location.LocationTagger
 import com.expensetracker.app.data.Places
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +45,8 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
     val settings: StateFlow<Settings> = _settings.asStateFlow()
 
     /** Entries repeated at least twice in the last 90 days, most frequent first. */
-    val templates: StateFlow<List<QuickTemplate>> = _expenses.map { frequentTemplates(it) }
+    /** Context-aware one-tap suggestions from the predictor (ml/). */
+    val templates: StateFlow<List<QuickTemplate>> = _expenses.map { Predictor.suggestions(java.time.LocalDateTime.now()) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Classifier verdict per expense id (income has none). Recomputed whenever data changes. */
@@ -81,7 +83,7 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-reads the DB; called on resume since the notification/widget can add entries meanwhile. */
     fun reload() {
         viewModelScope.launch {
-            _expenses.value = withContext(Dispatchers.IO) { db.all() }
+            _expenses.value = withContext(Dispatchers.IO) { db.all().also { Predictor.train(it) } }
         }
     }
 
@@ -90,7 +92,10 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val list = withContext(Dispatchers.IO) {
                 block()
-                db.all().also { QuickLog.refreshAll(getApplication(), it) }
+                db.all().also {
+                    Predictor.train(it)
+                    QuickLog.refreshAll(getApplication(), it)
+                }
             }
             _expenses.value = list
             after()
@@ -99,9 +104,21 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
 
     fun add(e: Expense) {
         var id = 0L
-        write({ id = db.insert(e.copy(id = 0)) }) { autoTag(listOf(e), listOf(id)) }
+        write({ id = db.insert(e.copy(id = 0)) }) {
+            Predictor.learn(e.copy(id = id))
+            autoTag(listOf(e), listOf(id))
+        }
     }
-    fun update(e: Expense) = write({ db.update(e) })
+    fun update(e: Expense) = write({ db.update(e) }) { Predictor.learn(e) }
+
+    /** Moves all entries from one category to another (used when deleting/merging categories). */
+    fun recategorize(from: Category, to: Category, onDone: (Int) -> Unit = {}) {
+        var n = 0
+        write({ n = db.recategorize(from, to) }) { onDone(n) }
+    }
+
+    /** Unlinks entries from a deleted savings goal. */
+    fun clearGoal(goalId: String) = write({ db.clearGoal(goalId) })
     fun delete(e: Expense) = write({ db.delete(e.id) })
     fun restore(e: Expense) = write({ db.insert(e) })
 
@@ -145,14 +162,9 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         return e
     }
 
-    /** Uses the category you last gave the same note; otherwise the keyword guess. */
-    fun suggestCategory(note: String): Category {
-        val key = noteKey(note)
-        if (key.isNotEmpty()) {
-            _expenses.value.firstOrNull { noteKey(it.note) == key }?.let { return it.category }
-        }
-        return Categorizer.guess(note)
-    }
+    /** Category guess for a typed note, from the self-improving predictor (ml/). */
+    fun suggestCategory(note: String, amountPaise: Long? = null, place: String? = null): Category =
+        Predictor.predictCategory(note, amountPaise, java.time.LocalDateTime.now(), place)
 
     fun previewImport(text: String, firstYear: Int, undatedMonth: java.time.YearMonth? = null): ParseResult =
         NotesParser.parse(text, firstYear, undatedMonth)

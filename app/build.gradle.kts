@@ -3,6 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Parallel sessions build with -PbuildSuffix=<name> so their outputs don't collide.
+providers.gradleProperty("buildSuffix").orNull?.let { layout.buildDirectory.set(file("build-$it")) }
+
 android {
     namespace = "com.expensetracker.app"
     compileSdk = 36

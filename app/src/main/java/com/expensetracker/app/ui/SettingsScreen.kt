@@ -57,6 +57,7 @@ fun SettingsScreen(
     snackbar: SnackbarHostState,
     bottomBar: @Composable () -> Unit,
     onOpenImport: () -> Unit,
+    onOpen: (Overlay) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -300,7 +301,35 @@ fun SettingsScreen(
             )
 
             HorizontalDivider()
+            SectionTitle("Smart features")
+            ListItem(
+                headlineContent = { Text("Auto-capture payments") },
+                supportingContent = { Text("Turn UPI and bank payment notifications into entries to review") },
+                modifier = Modifier.clickable { onOpen(Overlay.CAPTURE) },
+            )
+            ListItem(
+                headlineContent = { Text("Savings goals") },
+                supportingContent = { Text("Set your own goals and track progress") },
+                modifier = Modifier.clickable { onOpen(Overlay.GOALS) },
+            )
+            ListItem(
+                headlineContent = { Text("Insights") },
+                supportingContent = { Text("Trends, habits and a weekly summary") },
+                modifier = Modifier.clickable { onOpen(Overlay.INSIGHTS) },
+            )
+            ListItem(
+                headlineContent = { Text("Categories") },
+                supportingContent = { Text("Add your own, rename, recolour or hide") },
+                modifier = Modifier.clickable { onOpen(Overlay.CATEGORIES) },
+            )
+
+            HorizontalDivider()
             SectionTitle("Your data")
+            ListItem(
+                headlineContent = { Text("Automatic backups") },
+                supportingContent = { Text("Back up to a folder of your choice on a schedule") },
+                modifier = Modifier.clickable { onOpen(Overlay.BACKUP) },
+            )
             ListItem(
                 headlineContent = { Text("Import from notes") },
                 supportingContent = { Text("Paste your old notes-app history (“5000 - Mammi” style)") },

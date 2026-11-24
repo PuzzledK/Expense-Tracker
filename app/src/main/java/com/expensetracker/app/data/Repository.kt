@@ -18,6 +18,12 @@ class SettingsStore(context: Context) {
         homeCity = prefs.getString("homeCity", "") ?: "",
         appLock = prefs.getBoolean("appLock", false),
         lockTimeoutSec = prefs.getInt("lockTimeoutSec", 30),
+        captureEnabled = prefs.getBoolean("captureEnabled", false),
+        autoBackupEnabled = prefs.getBoolean("autoBackupEnabled", false),
+        autoBackupTreeUri = prefs.getString("autoBackupTreeUri", "") ?: "",
+        autoBackupEveryDays = prefs.getInt("autoBackupEveryDays", 1),
+        autoBackupKeep = prefs.getInt("autoBackupKeep", 14),
+        insightsNotification = prefs.getBoolean("insightsNotification", false),
     )
 
     fun save(s: Settings) = prefs.edit {
@@ -31,6 +37,12 @@ class SettingsStore(context: Context) {
         putString("homeCity", s.homeCity)
         putBoolean("appLock", s.appLock)
         putInt("lockTimeoutSec", s.lockTimeoutSec)
+        putBoolean("captureEnabled", s.captureEnabled)
+        putBoolean("autoBackupEnabled", s.autoBackupEnabled)
+        putString("autoBackupTreeUri", s.autoBackupTreeUri)
+        putInt("autoBackupEveryDays", s.autoBackupEveryDays)
+        putInt("autoBackupKeep", s.autoBackupKeep)
+        putBoolean("insightsNotification", s.insightsNotification)
     }
 }
 

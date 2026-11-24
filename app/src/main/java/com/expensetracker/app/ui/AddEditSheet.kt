@@ -90,6 +90,7 @@ fun AddEditSheet(
     var isIncome by rememberSaveable { mutableStateOf(existing?.isIncome ?: false) }
     var date by rememberSaveable { mutableStateOf(existing?.date ?: defaultDate ?: LocalDate.now()) }
     var place by rememberSaveable { mutableStateOf(existing?.place) }
+    var goalId by rememberSaveable { mutableStateOf(existing?.goalId) }
     // null = let the classifier decide ("Auto").
     var spendOverride by rememberSaveable { mutableStateOf(existing?.spendOverride) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -155,9 +156,10 @@ fun AddEditSheet(
         val cleanNote = note.trim()
         if (existing != null) {
             vm.update(existing.copy(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride,
-                time = time, place = place, lat = if (place == existing.place) existing.lat else null, lon = if (place == existing.place) existing.lon else null))
+                time = time, place = place, lat = if (place == existing.place) existing.lat else null, lon = if (place == existing.place) existing.lon else null,
+                goalId = goalId))
         } else {
-            vm.add(Expense(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride, place = place, time = time))
+            vm.add(Expense(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride, place = place, time = time, goalId = goalId))
         }
         close()
     }
@@ -290,6 +292,9 @@ fun AddEditSheet(
             }
             Spacer(Modifier.height(8.dp))
 
+            if (category == Category.SAVINGS || goalId != null) {
+                com.expensetracker.app.goals.GoalPickerRow(vm, goalId, onChange = { goalId = it })
+            }
             Text("Category", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Category.entries.forEach { c ->

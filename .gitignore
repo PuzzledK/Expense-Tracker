@@ -7,3 +7,6 @@ local.properties
 # Built APK copy (rebuild with ./gradlew :app:assembleRelease)
 *.apk
 .kotlin/
+build-*/
+.gradle-*/
+.kotlin-*/

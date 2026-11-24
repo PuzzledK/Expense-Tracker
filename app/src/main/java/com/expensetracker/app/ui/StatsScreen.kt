@@ -64,6 +64,7 @@ fun StatsScreen(
     onMonthChange: (YearMonth) -> Unit,
     bottomBar: @Composable () -> Unit,
     onEdit: (Expense) -> Unit,
+    onOpen: (Overlay) -> Unit = {},
 ) {
     val all by vm.expenses.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -130,6 +131,7 @@ fun StatsScreen(
                 .padding(bottom = 24.dp),
         ) {
             MonthSelector(month, onMonthChange, Modifier.padding(horizontal = 4.dp))
+            com.expensetracker.app.goals.GoalsCard(vm, onOpen = { onOpen(Overlay.GOALS) })
 
             // Headline numbers
             Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

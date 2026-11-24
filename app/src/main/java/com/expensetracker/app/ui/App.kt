@@ -42,6 +42,9 @@ import java.time.YearMonth
 
 enum class Tab { HOME, STATS, SETTINGS }
 
+/** Full-screen feature pages opened over the tabs. */
+enum class Overlay { CATEGORIES, GOALS, INSIGHTS, CAPTURE, BACKUP }
+
 /** State of the add/edit sheet: closed, adding a new entry, or editing an existing one. */
 sealed interface SheetState {
     data object Closed : SheetState
@@ -54,6 +57,7 @@ sealed interface SheetState {
 fun ExpenseApp(vm: ExpenseViewModel, openAddRequests: Int, openBulkRequests: Int = 0) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var showImport by rememberSaveable { mutableStateOf(false) }
+    var overlay by rememberSaveable { mutableStateOf<Overlay?>(null) }
     // Month shared between Home and Stats so switching tabs keeps context.
     var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthText)
@@ -115,7 +119,19 @@ fun ExpenseApp(vm: ExpenseViewModel, openAddRequests: Int, openBulkRequests: Int
         }
     }
 
-    if (showImport) {
+    BackHandler(enabled = overlay != null) { overlay = null }
+
+    if (overlay != null) {
+        val close = { overlay = null }
+        when (overlay) {
+            Overlay.CATEGORIES -> com.expensetracker.app.categories.ManageCategoriesScreen(vm, close)
+            Overlay.GOALS -> com.expensetracker.app.goals.GoalsScreen(vm, close)
+            Overlay.INSIGHTS -> com.expensetracker.app.insights.InsightsScreen(vm, close)
+            Overlay.CAPTURE -> com.expensetracker.app.capture.CaptureInboxScreen(vm, close)
+            Overlay.BACKUP -> com.expensetracker.app.backup.BackupSettingsScreen(vm, close)
+            null -> Unit
+        }
+    } else if (showImport) {
         ImportScreen(
             vm = vm,
             snackbar = snackbar,
@@ -138,12 +154,14 @@ fun ExpenseApp(vm: ExpenseViewModel, openAddRequests: Int, openBulkRequests: Int
                 snackbar = snackbar,
                 bottomBar = bottomBar,
                 onAdd = { sheet = SheetState.Adding },
+                onOpen = { overlay = it },
                 onBulkAdd = { sheet = SheetState.Bulk(it) },
                 onEdit = { sheet = SheetState.Editing(it) },
                 onOpenImport = { showImport = true },
             )
             Tab.STATS -> StatsScreen(
                 vm = vm,
+                onOpen = { overlay = it },
                 month = month,
                 onMonthChange = { monthText = it.toString() },
                 bottomBar = bottomBar,
@@ -154,6 +172,7 @@ fun ExpenseApp(vm: ExpenseViewModel, openAddRequests: Int, openBulkRequests: Int
                 snackbar = snackbar,
                 bottomBar = bottomBar,
                 onOpenImport = { showImport = true },
+                onOpen = { overlay = it },
             )
         }
     }

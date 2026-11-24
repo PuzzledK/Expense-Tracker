@@ -9,7 +9,11 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 /** Plain SQLite storage; no annotation processing needed. */
-class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", null, 4) {
+class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", null, 5) {
+
+    init {
+        CategoryRegistry.ensureLoaded(context)
+    }
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -26,7 +30,8 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
                 place TEXT,
                 lat REAL,
                 lon REAL,
-                time_min INTEGER
+                time_min INTEGER,
+                goal_id TEXT
             )
             """.trimIndent()
         )
@@ -44,10 +49,12 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         }
         // v4: time of day (minutes since midnight) for quick entries.
         if (oldVersion < 4) db.execSQL("ALTER TABLE expenses ADD COLUMN time_min INTEGER")
+        // v5: savings goal link.
+        if (oldVersion < 5) db.execSQL("ALTER TABLE expenses ADD COLUMN goal_id TEXT")
     }
 
     fun all(): List<Expense> = readableDatabase.rawQuery(
-        "SELECT id, amount_paise, note, category, epoch_day, is_income, created_at, spend_override, place, lat, lon, time_min FROM expenses " +
+        "SELECT id, amount_paise, note, category, epoch_day, is_income, created_at, spend_override, place, lat, lon, time_min, goal_id FROM expenses " +
             "ORDER BY epoch_day DESC, created_at DESC, id DESC",
         null,
     ).use { c -> buildList { while (c.moveToNext()) add(c.toExpense()) } }
@@ -108,6 +115,18 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         return writableDatabase.update("expenses", v, where, arrayOf(from.toEpochDay().toString(), to.toEpochDay().toString()))
     }
 
+    /** Moves every entry from one category to another (deleting/merging a custom category). */
+    fun recategorize(from: Category, to: Category): Int {
+        val v = ContentValues().apply { put("category", to.id) }
+        return writableDatabase.update("expenses", v, "category = ?", arrayOf(from.id))
+    }
+
+    /** Detaches entries from a deleted goal. */
+    fun clearGoal(goalId: String): Int {
+        val v = ContentValues().apply { putNull("goal_id") }
+        return writableDatabase.update("expenses", v, "goal_id = ?", arrayOf(goalId))
+    }
+
     fun update(e: Expense) {
         writableDatabase.update("expenses", e.toValues(keepId = false), "id = ?", arrayOf(e.id.toString()))
     }
@@ -133,13 +152,14 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         put("lat", lat)
         put("lon", lon)
         put("time_min", time?.let { it.hour * 60 + it.minute })
+        put("goal_id", goalId)
     }
 
     private fun Cursor.toExpense() = Expense(
         id = getLong(0),
         amountPaise = getLong(1),
         note = getString(2),
-        category = runCatching { Category.valueOf(getString(3)) }.getOrDefault(Category.OTHER),
+        category = Category.fromId(getString(3)),
         date = LocalDate.ofEpochDay(getLong(4)),
         isIncome = getInt(5) == 1,
         createdAt = getLong(6),
@@ -148,5 +168,6 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         lat = if (isNull(9)) null else getDouble(9),
         lon = if (isNull(10)) null else getDouble(10),
         time = if (isNull(11)) null else getInt(11).let { LocalTime.of(it / 60, it % 60) },
+        goalId = if (isNull(12)) null else getString(12),
     )
 }

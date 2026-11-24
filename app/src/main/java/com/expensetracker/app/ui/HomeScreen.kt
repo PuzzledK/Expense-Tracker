@@ -94,6 +94,7 @@ fun HomeScreen(
     snackbar: SnackbarHostState,
     bottomBar: @Composable () -> Unit,
     onAdd: () -> Unit,
+    onOpen: (Overlay) -> Unit = {},
     onBulkAdd: (LocalDate) -> Unit,
     onEdit: (Expense) -> Unit,
     onOpenImport: () -> Unit,
@@ -223,6 +224,12 @@ fun HomeScreen(
                 }
                 item("summary") {
                     SummaryCard(expenses, month, settings, today, spendInfo)
+                }
+                item("capture") {
+                    com.expensetracker.app.capture.CaptureBanner(onOpen = { onOpen(Overlay.CAPTURE) })
+                }
+                item("insights") {
+                    com.expensetracker.app.insights.InsightsCard(vm, onOpen = { onOpen(Overlay.INSIGHTS) })
                 }
                 item("quick") {
                     QuickAddBar(
@@ -567,6 +574,8 @@ fun ExpenseRow(expense: Expense, onClick: () -> Unit, showDate: Boolean = false,
 
 @Composable
 fun CategoryBadge(expense: Expense) {
+    // Re-read when categories are renamed/recoloured.
+    com.expensetracker.app.data.CategoryRegistry.version.collectAsStateWithLifecycle().value
     Box(
         modifier = Modifier
             .size(40.dp)

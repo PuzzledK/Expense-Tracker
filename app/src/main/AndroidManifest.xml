@@ -57,6 +57,25 @@
                 android:resource="@xml/expense_widget_info" />
         </receiver>
 
+        <!-- Auto-capture: reads payment notifications once you grant notification access. -->
+        <service
+            android:name=".capture.PaymentListenerService"
+            android:exported="true"
+            android:label="Expenses payment capture"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".backup.AutoBackupReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".insights.InsightsReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />

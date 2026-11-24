@@ -3,20 +3,6 @@ package com.expensetracker.app.data
 import java.time.LocalDate
 import java.time.LocalTime
 
-/** Fixed category set. `color` is ARGB. */
-enum class Category(val label: String, val emoji: String, val color: Long) {
-    FOOD("Food", "🍔", 0xFFEF6C00),
-    GROCERIES("Groceries", "🛒", 0xFF43A047),
-    TRANSPORT("Transport", "🛺", 0xFF1E88E5),
-    RENT("Rent & Bills", "🏠", 0xFF6D4C41),
-    BILLS("Recharge & Subs", "📱", 0xFF8E24AA),
-    SHOPPING("Shopping", "🛍️", 0xFFD81B60),
-    PEOPLE("Family & Gifts", "🎁", 0xFFE53935),
-    HEALTH("Health & Fitness", "💪", 0xFF00897B),
-    ENTERTAINMENT("Fun & Outings", "🎉", 0xFFFDD835),
-    SAVINGS("Savings", "🏦", 0xFF546E7A),
-    OTHER("Other", "📦", 0xFF757575);
-}
 
 /** Money is always stored as paise (1 rupee = 100 paise) to avoid float errors. */
 data class Expense(
@@ -37,6 +23,8 @@ data class Expense(
     val lon: Double? = null,
     /** Clock time it was spent, recorded by quick entries logged for today; null = unknown. */
     val time: LocalTime? = null,
+    /** Savings goal this entry counts towards (see goals/); null = none. */
+    val goalId: String? = null,
 )
 
 /** How an expense should count towards averages. */
@@ -90,6 +78,17 @@ data class Settings(
     val appLock: Boolean = false,
     /** Grace period after leaving the app before it locks again. 0 = immediately. */
     val lockTimeoutSec: Int = 30,
+    /** Turn UPI/bank payment notifications into entries to review (capture/). */
+    val captureEnabled: Boolean = false,
+    /** Scheduled backups to a folder you picked (backup/). */
+    val autoBackupEnabled: Boolean = false,
+    /** Persisted SAF tree URI of the backup folder; "" = not chosen. */
+    val autoBackupTreeUri: String = "",
+    val autoBackupEveryDays: Int = 1,
+    /** How many backup files to keep in the folder (oldest deleted). */
+    val autoBackupKeep: Int = 14,
+    /** Weekly "your week in spending" notification (insights/). */
+    val insightsNotification: Boolean = false,
 )
 
 /** A frequently repeated entry offered as a one-tap chip, e.g. "Lunch + Diet coke ₹142". */
