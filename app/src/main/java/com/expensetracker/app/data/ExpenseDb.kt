@@ -51,6 +51,8 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
             "ORDER BY epoch_day DESC, created_at DESC, id DESC",
         null,
     ).use { c -> buildList { while (c.moveToNext()) add(c.toExpense()) } }
+        // Within a day, order by time of day rather than by when it was typed in.
+        .sortedWith(EntryOrder.comparator())
 
     /** Inserts and returns the new row id. A non-zero id is kept (used for undo). */
     fun insert(e: Expense): Long = writableDatabase.insertOrThrow("expenses", null, e.toValues(keepId = e.id != 0L))

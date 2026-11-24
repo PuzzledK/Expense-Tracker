@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -55,6 +57,7 @@ import com.expensetracker.app.data.Category
 import com.expensetracker.app.data.Expense
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * Add many entries for one day, typed the way the notes app was used:
@@ -79,14 +82,17 @@ fun BulkAddSheet(
     var place by rememberSaveable { mutableStateOf<String?>(null) }
 
     var text by rememberSaveable { mutableStateOf("") }
-    var date by remember { mutableStateOf(initialDate) }
+    var date by rememberSaveable { mutableStateOf(initialDate) }
+    // Optional: one time of day for every line (null = none; today's lines then sort by when you added them).
+    var time by rememberSaveable { mutableStateOf<LocalTime?>(null) }
+    var showTimePicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     // Category overrides keyed by the line's text, so they survive edits to other lines.
     val overrides = remember { mutableStateMapOf<String, Category>() }
     val focus = remember { FocusRequester() }
 
     val preview = remember(text, date, all) { vm.previewBulk(text, date) }
-    val valid = preview.mapNotNull { (line, e) -> e?.let { it.copy(category = overrides[line] ?: it.category, place = place) } }
+    val valid = preview.mapNotNull { (line, e) -> e?.let { it.copy(category = overrides[line] ?: it.category, place = place, time = time) } }
     val invalidCount = preview.count { it.second == null }
     val spend = valid.filter { !it.isIncome }.sumOf { it.amountPaise }
     val income = valid.filter { it.isIncome }.sumOf { it.amountPaise }
@@ -128,6 +134,29 @@ fun BulkAddSheet(
                 listOf(0L to "Today", 1L to "Yesterday", 2L to "2 days ago").forEach { (back, label) ->
                     val d = LocalDate.now().minusDays(back)
                     TextButton(onClick = { date = d }, enabled = date != d) { Text(label) }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Time for all: ", style = MaterialTheme.typography.bodyMedium)
+                val t = time
+                if (t == null) {
+                    AssistChip(
+                        onClick = { showTimePicker = true },
+                        label = { Text("Add time") },
+                        leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null, Modifier.size(18.dp)) },
+                    )
+                } else {
+                    AssistChip(
+                        onClick = { showTimePicker = true },
+                        label = { Text(formatTime(t.hour, t.minute)) },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Clear time",
+                                Modifier.size(18.dp).clickable { time = null },
+                            )
+                        },
+                    )
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -216,6 +245,16 @@ fun BulkAddSheet(
 
     if (showDatePicker) {
         DatePickDialog(initial = date, onPick = { date = it }, onDismiss = { showDatePicker = false })
+    }
+    if (showTimePicker) {
+        val init = time ?: LocalTime.now()
+        TimePickDialog(
+            hour = init.hour,
+            minute = init.minute,
+            onPick = { h, m -> time = LocalTime.of(h, m) },
+            onDismiss = { showTimePicker = false },
+            title = "Time for all entries",
+        )
     }
 }
 

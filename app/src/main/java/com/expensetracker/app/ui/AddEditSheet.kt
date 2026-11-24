@@ -85,16 +85,16 @@ fun AddEditSheet(
 
     var amountText by rememberSaveable { mutableStateOf(existing?.let { paiseToInput(it.amountPaise) } ?: "") }
     var note by rememberSaveable { mutableStateOf(existing?.note ?: "") }
-    var category by remember { mutableStateOf(existing?.category ?: Category.FOOD) }
+    var category by rememberSaveable { mutableStateOf(existing?.category ?: Category.FOOD) }
     var categoryPicked by rememberSaveable { mutableStateOf(existing != null) }
     var isIncome by rememberSaveable { mutableStateOf(existing?.isIncome ?: false) }
-    var date by remember { mutableStateOf(existing?.date ?: defaultDate ?: LocalDate.now()) }
+    var date by rememberSaveable { mutableStateOf(existing?.date ?: defaultDate ?: LocalDate.now()) }
     var place by rememberSaveable { mutableStateOf(existing?.place) }
     // null = let the classifier decide ("Auto").
-    var spendOverride by remember { mutableStateOf(existing?.spendOverride) }
+    var spendOverride by rememberSaveable { mutableStateOf(existing?.spendOverride) }
     var showDatePicker by remember { mutableStateOf(false) }
     // New entries for today start at the current time; clear it with the ✕ on the chip.
-    var time by remember {
+    var time by rememberSaveable {
         mutableStateOf(
             if (existing != null) existing.time
             else if ((defaultDate ?: LocalDate.now()) == LocalDate.now()) LocalTime.now().withSecond(0).withNano(0)
@@ -102,6 +102,13 @@ fun AddEditSheet(
         )
     }
     var showTimePicker by remember { mutableStateOf(false) }
+    // The current time is only a guess for a new entry; once you pick or clear it, it's yours.
+    var timeTouched by rememberSaveable { mutableStateOf(existing != null) }
+
+    fun changeDate(d: LocalDate) {
+        date = d
+        if (!timeTouched) time = if (d == LocalDate.now()) LocalTime.now().withSecond(0).withNano(0) else null
+    }
     var amountError by remember { mutableStateOf(false) }
     val amountFocus = remember { FocusRequester() }
 
@@ -266,7 +273,7 @@ fun AddEditSheet(
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = "Clear time",
-                                Modifier.size(18.dp).clickable { time = null },
+                                Modifier.size(18.dp).clickable { time = null; timeTouched = true },
                             )
                         },
                     )
@@ -347,14 +354,14 @@ fun AddEditSheet(
     }
 
     if (showDatePicker) {
-        DatePickDialog(initial = date, onPick = { date = it }, onDismiss = { showDatePicker = false })
+        DatePickDialog(initial = date, onPick = { changeDate(it) }, onDismiss = { showDatePicker = false })
     }
     if (showTimePicker) {
         val init = time ?: LocalTime.now()
         TimePickDialog(
             hour = init.hour,
             minute = init.minute,
-            onPick = { h, m -> time = LocalTime.of(h, m) },
+            onPick = { h, m -> time = LocalTime.of(h, m); timeTouched = true },
             onDismiss = { showTimePicker = false },
             title = "Time spent",
         )
