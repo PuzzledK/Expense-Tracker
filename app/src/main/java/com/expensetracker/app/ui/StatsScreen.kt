@@ -167,6 +167,10 @@ fun StatsScreen(
                 )
             }
 
+            SectionCard("Calendar") {
+                CalendarHeatmap(month, all, spendInfo, excl, onEdit)
+            }
+
             SectionCard("Everyday vs one-offs") {
                 if (total == 0L) {
                     EmptyHint()
@@ -230,7 +234,7 @@ fun StatsScreen(
 
             SectionCard("Biggest expenses") {
                 if (top5.isEmpty()) EmptyHint()
-                top5.forEach { e -> ExpenseRow(e, onClick = { onEdit(e) }, showDate = true, spend = spendInfo[e.id]) }
+                top5.forEach { e -> ExpenseRow(e, onClick = { onEdit(e) }, showDate = true, spend = spendInfo[e.id], background = Color.Transparent) }
             }
         }
     }
@@ -611,7 +615,7 @@ private fun TripRow(trip: com.expensetracker.app.data.Trip, onEdit: (Expense) ->
             style = MaterialTheme.typography.bodySmall,
         )
         if (open) {
-            trip.entries.sortedByDescending { it.date }.forEach { e -> ExpenseRow(e, onClick = { onEdit(e) }, showDate = true) }
+            trip.entries.sortedByDescending { it.date }.forEach { e -> ExpenseRow(e, onClick = { onEdit(e) }, showDate = true, background = Color.Transparent) }
         }
     }
 }

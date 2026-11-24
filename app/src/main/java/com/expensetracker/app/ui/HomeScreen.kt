@@ -612,9 +612,16 @@ private fun SwipeableExpenseRow(
 }
 
 @Composable
-fun ExpenseRow(expense: Expense, onClick: () -> Unit, showDate: Boolean = false, spend: SpendInfo? = null) {
+fun ExpenseRow(
+    expense: Expense,
+    onClick: () -> Unit,
+    showDate: Boolean = false,
+    spend: SpendInfo? = null,
+    /** Opaque on Home (covers the swipe-to-delete background); pass Transparent inside cards. */
+    background: Color = MaterialTheme.colorScheme.background,
+) {
     val style = LocalAppStyle.current
-    Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.background(background)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
