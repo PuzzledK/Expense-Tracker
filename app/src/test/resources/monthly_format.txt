@@ -1,0 +1,144 @@
+104-- cab to ptp
+100-- bike to pg
+150-- zepto
+40-- bus
+80-- breakfast
+87-- schezwan rice
+239-- wiper and essentials
+353-- cab to architha
+385-- cab to pg
+120-- rich chocolate torte
+50-- pizza
+40-- bus
+980-- Recharge
+95-- cafeteria
+40-- bus
+20-- chips
+50-- dosa
+40-- bus
+100-- lunch
+106-- container
+245-- mcd
+120-- dinner and essentials
+115-- cab
+40-- bus
+200-- lunch
+20-- bus
+50-- dosa
+30-- bus
+100-- Sandwich
+60-- chocolate
+55-- lunch
+40-- bus
+164-- rapido
+177-- rapido
+100-- chadhava
+105-- cab
+20-- bus
+55-- sandwich
+30-- snickers
+63-- shake
+517-- blinkit
+40-- bus
+105-- lunch
+40-- bus
+50-- dosa
+
+---------------------------------------------------------------------
+OCTOBER 2026
+
+186-- Cab
+38-- maggi
+18000-- pg rent
+40-- bhelpuri
+148-- instamart
+42-- taxi
+90-- sweet corn, soda
+900-- baby gift
+52-- taxi
+226-- cab
+200-- bangles
+423-- mummy shampoo
+269-- big basket (essentials)
+94-- lunch
+274-- skirt
+150-- dupatta
+117-- top
+3250-- dushyant gift
+1110-- dushyant train ticket
+94-- lunch
+11648-- flight
+265-- oats
+40-- bus
+94-- lunch
+40-- bus
+94-- lunch
+99-- pillow cover
+209-- instamart
+94-- lunch
+1-- hoppr
+18-- hoppr
+50-- lunch
+902-- mummy recharge
+40-- bus
+85-- lunch
+40-- bus
+74-- dinner
+324-- garba ticket
+430-- inder gift
+623-- pan
+88-- cab
+184-- cab
+247-- zepto
+40-- bus
+173-- shampoo
+215-- movie ticket
+110-- cab
+136-- cab
+157-- big basket
+40-- bus
+47-- fruit bowl
+40-- bus
+219-- instamart
+1000-- chin lungs
+176-- rapido
+1087-- zudio
+189-- rapido
+200-- chadava
+40-- bus
+55-- lunch
+40-- bus
+55-- sandwich
+40-- bus
+243-- zepto
+105-- instamart
+755-- cab to airport
+53-- cab ggn
+130-- lunch
+1200-- dinner date
+
+---------------------------------------------------------------------
+NOVEMBER 2026
+
+95-- lunch
+165-- cab
+18000-- rent
+75-- cab
+879-- anna dosa
+6626-- KI
+360-- bus
+76-- auto
+303-- shampoo
+25-- bus
+55-- sandwich
+25-- bus
+357-- zepto
+2700-- yajushi gift
+50-- bus
+55-- sandwich
+44-- juice
+25-- bus
+46-- rapido
+800-- avance derma consultation fee
+4376-- medicine
+600-- gynec consultation fee

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- receipt body with zig-zag bottom -->
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M36,30 L72,30 L72,78 L68,74 L64,78 L60,74 L56,78 L52,74 L48,78 L44,74 L40,78 L36,74 Z" />
+    <!-- rupee sign -->
+    <path
+        android:fillColor="@color/launcher_background"
+        android:pathData="M44,38 L64,38 L64,42 L57.5,42 C58.6,43.1 59.3,44.4 59.6,46 L64,46 L64,50 L59.6,50 C58.9,54.2 55.6,57.2 51,57.8 L61,68 L55.4,68 L45.4,57.6 L45.4,54 L50,54 C52.8,54 55,52.6 55.6,50 L44,50 L44,46 L55.6,46 C55,43.4 52.8,42 50,42 L44,42 Z" />
+</vector>
