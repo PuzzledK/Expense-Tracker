@@ -24,6 +24,8 @@ class SettingsStore(context: Context) {
         autoBackupEveryDays = prefs.getInt("autoBackupEveryDays", 1),
         autoBackupKeep = prefs.getInt("autoBackupKeep", 14),
         insightsNotification = prefs.getBoolean("insightsNotification", false),
+        themeId = prefs.getString("themeId", "classic") ?: "classic",
+        darkMode = prefs.getInt("darkMode", 0),
     )
 
     fun save(s: Settings) = prefs.edit {
@@ -43,6 +45,8 @@ class SettingsStore(context: Context) {
         putInt("autoBackupEveryDays", s.autoBackupEveryDays)
         putInt("autoBackupKeep", s.autoBackupKeep)
         putBoolean("insightsNotification", s.insightsNotification)
+        putString("themeId", s.themeId)
+        putInt("darkMode", s.darkMode)
     }
 }
 

@@ -32,7 +32,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.expensetracker.app.ui.kit.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -148,6 +148,14 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            SectionTitle("Appearance")
+            AppearanceSection(
+                settings = settings,
+                onTheme = { id -> vm.updateSettings { it.copy(themeId = id) } },
+                onDarkMode = { m -> vm.updateSettings { it.copy(darkMode = m) } },
+            )
+
+            HorizontalDivider()
             SectionTitle("Budget")
             ListItem(
                 headlineContent = { Text("Monthly budget") },
@@ -510,11 +518,12 @@ fun SettingsScreen(
 
 @Composable
 private fun SectionTitle(text: String) {
+    val style = LocalAppStyle.current
     Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
+        if (style.capsLabels) text.uppercase() else text,
+        style = if (style.capsLabels) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp),
     )
 }
 

@@ -40,9 +40,19 @@ class MainActivity : ComponentActivity() {
         com.expensetracker.app.backup.AutoBackup.restore(this)
         com.expensetracker.app.insights.Insights.restore(this)
         setContent {
-            ExpenseTheme {
+            val settings by vm.settings.collectAsStateWithLifecycle()
+            val theme = com.expensetracker.app.ui.AppThemeId.of(settings.themeId)
+            val dark = com.expensetracker.app.ui.isDarkFor(theme, settings.darkMode)
+            // Status/navigation bar icons must follow the app's light/dark, not the phone's.
+            androidx.compose.runtime.LaunchedEffect(dark) {
+                val t = android.graphics.Color.TRANSPARENT
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) androidx.activity.SystemBarStyle.dark(t) else androidx.activity.SystemBarStyle.light(t, t),
+                    navigationBarStyle = if (dark) androidx.activity.SystemBarStyle.dark(t) else androidx.activity.SystemBarStyle.light(t, t),
+                )
+            }
+            ExpenseTheme(themeId = settings.themeId, darkMode = settings.darkMode) {
                 val all by vm.expenses.collectAsStateWithLifecycle()
-                val settings by vm.settings.collectAsStateWithLifecycle()
                 val home = remember(all, settings.homeCity) { Places.homeCity(all, settings) }
                 CompositionLocalProvider(LocalHomeCity provides home, LocalAppLock provides appLock) {
                     if (appLock.locked) {

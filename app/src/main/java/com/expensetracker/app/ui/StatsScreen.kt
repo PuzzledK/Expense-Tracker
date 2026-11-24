@@ -19,13 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
+import com.expensetracker.app.ui.kit.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
+import com.expensetracker.app.ui.kit.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.expensetracker.app.ui.kit.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -238,20 +238,37 @@ fun StatsScreen(
 
 @Composable
 private fun StatTile(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Color.Unspecified) {
+    val style = LocalAppStyle.current
     Card(modifier) {
-        Column(Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = valueColor, maxLines = 1)
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                if (style.capsLabels) label.uppercase() else label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(value, style = style.money(MaterialTheme.typography.titleLarge), color = valueColor, maxLines = 1)
         }
     }
 }
 
 @Composable
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
+    val style = LocalAppStyle.current
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (style.isBrutal) {
+                    Box(Modifier.size(12.dp).background(style.accent(title.length), MaterialTheme.shapes.extraSmall))
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    if (style.isBrutal) title.uppercase() else title,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            Spacer(Modifier.height(14.dp))
             content()
         }
     }

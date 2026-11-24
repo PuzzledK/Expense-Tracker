@@ -1,5 +1,11 @@
 package com.expensetracker.app.ui
 
+import androidx.compose.ui.graphics.Color
+
+import androidx.compose.ui.draw.drawBehind
+
+import androidx.compose.material3.NavigationBarItemDefaults
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Row
@@ -112,24 +118,39 @@ fun ExpenseApp(
     BackHandler(enabled = !showImport && tab != Tab.HOME) { tab = Tab.HOME }
 
     val bottomBar: @Composable () -> Unit = {
-        NavigationBar {
+        val style = LocalAppStyle.current
+        val navColors = NavigationBarItemDefaults.colors(
+            indicatorColor = if (style.isBrutal) style.accent(0) else MaterialTheme.colorScheme.secondaryContainer,
+            selectedIconColor = if (style.isBrutal) Color(0xFF111111) else MaterialTheme.colorScheme.onSecondaryContainer,
+            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+        )
+        NavigationBar(
+            containerColor = if (style.isBrutal) MaterialTheme.colorScheme.surfaceContainerLowest else MaterialTheme.colorScheme.surfaceContainer,
+            tonalElevation = 0.dp,
+            modifier = if (style.isBrutal) Modifier.drawBehind {
+                drawRect(style.borderColor, size = androidx.compose.ui.geometry.Size(size.width, style.borderWidth.toPx()))
+            } else Modifier,
+        ) {
             NavigationBarItem(
                 selected = tab == Tab.HOME,
                 onClick = { tab = Tab.HOME },
                 icon = { Icon(Icons.Filled.Home, contentDescription = null) },
                 label = { Text("Home") },
+                colors = navColors,
             )
             NavigationBarItem(
                 selected = tab == Tab.STATS,
                 onClick = { tab = Tab.STATS },
                 icon = { BarsIcon() },
                 label = { Text("Stats") },
+                colors = navColors,
             )
             NavigationBarItem(
                 selected = tab == Tab.SETTINGS,
                 onClick = { tab = Tab.SETTINGS },
                 icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
                 label = { Text("Settings") },
+                colors = navColors,
             )
         }
     }

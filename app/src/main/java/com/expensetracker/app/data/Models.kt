@@ -89,6 +89,10 @@ data class Settings(
     val autoBackupKeep: Int = 14,
     /** Weekly "your week in spending" notification (insights/). */
     val insightsNotification: Boolean = false,
+    /** Look of the app (see ui/Theme.kt AppThemeId). */
+    val themeId: String = "classic",
+    /** 0 = follow system, 1 = light, 2 = dark. */
+    val darkMode: Int = 0,
 )
 
 /** A frequently repeated entry offered as a one-tap chip, e.g. "Lunch + Diet coke ₹142". */
