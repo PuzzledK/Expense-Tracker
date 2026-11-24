@@ -103,6 +103,17 @@ object PaymentParser {
     private val creditRe = Regex("""\breceived\b|\bcredited\b|\brefund(?:ed)?\b|\breversed\b|\breversal\b|\bdeposited\b|\b(?:paid|sent) you\b|\bgot ₹|\bgot rs""", RegexOption.IGNORE_CASE)
     private val debitRe = Regex("""\bpaid\b|\bsent\b|\bspent\b|\bpayment (?:of|to|for|successful|done|complete)|\bpurchase\b|\btransferred\b|\btrf to\b|\btransfer(?:red)? to\b|\btxn (?:of|at|for)\b|\btransaction (?:of|at)\b|\bused (?:for|at)\b|\bpaying\b|\bpay(?:ment)? success""", RegexOption.IGNORE_CASE)
 
+    /**
+     * Bank shorthand (Bank of Baroda, several PSU banks): "Rs.1.00 Dr. from A/C XX6932 and Cr. to x@upi"
+     * = money left your account; "Cr. to A/C XX6932 … Dr. from x@upi" = money came in.
+     * The side your A/C is on decides; a lone Dr./Cr. is the fallback.
+     */
+    private val drYourAccountRe = Regex("""\bdr\b\.?\s*(?:from|to|in)?\s*(?:your\s+)?(?:a/c|acct|account)\b""", RegexOption.IGNORE_CASE)
+    private val crYourAccountRe = Regex("""\bcr\b\.?\s*(?:to|in|into)?\s*(?:your\s+)?(?:a/c|acct|account)\b""", RegexOption.IGNORE_CASE)
+    /** Lone "Dr." / "Cr." followed by from/to — excludes "Dr. Mehta" (a doctor) and balances like "20459.64CR". */
+    private val drAloneRe = Regex("""\bdr\b\.?\s+(?:from|to)\b""", RegexOption.IGNORE_CASE)
+    private val crAloneRe = Regex("""\bcr\b\.?\s+(?:from|to)\b""", RegexOption.IGNORE_CASE)
+
     /** Bank SMS must look like a bank message, not a friend saying "sent ₹500 to Anu". */
     private val bankContextRe = Regex("""\ba/c\b|\bacct\b|\baccount\b|\bupi\b|\bvpa\b|\bcard\b|\bbank\b|\bimps\b|\bneft\b|\brtgs\b|\bref(?:\.|erence)?\s*(?:no|num|id)?\b|\btxn\b|\butr\b|\bwallet\b""", RegexOption.IGNORE_CASE)
     private val smsSenderRe = Regex("""^[A-Z]{2}-[A-Z0-9]{3,9}(?:-[A-Z])?$""")
@@ -112,7 +123,7 @@ object PaymentParser {
     private const val NAME = """([A-Za-z0-9&'@._ -]{2,60}?)"""
 
     private val vpaRe = Regex("""\b([A-Za-z0-9._-]{2,64}@[A-Za-z][A-Za-z0-9.]{1,30})\b""")
-    private val toVpaRe = Regex("""\b(?:to|trf to|towards)\s+(?:(?:vpa|upi(?:\s*id)?)\s*[:\-]?\s*)?([A-Za-z0-9._-]{2,64}@[A-Za-z][A-Za-z0-9.]{1,30})""", RegexOption.IGNORE_CASE)
+    private val toVpaRe = Regex("""\b(?:cr\.?\s+to|to|trf to|towards)\s+(?:(?:vpa|upi(?:\s*id)?)\s*[:\-]?\s*)?([A-Za-z0-9._-]{2,64}@[A-Za-z][A-Za-z0-9.]{1,30})""", RegexOption.IGNORE_CASE)
     private val fromVpaRe = Regex("""\b(?:from|by)\s+(?:(?:vpa|upi(?:\s*id)?)\s*[:\-]?\s*)?([A-Za-z0-9._-]{2,64}@[A-Za-z][A-Za-z0-9.]{1,30})""", RegexOption.IGNORE_CASE)
     /** "...to VPA zomato@icici ZOMATO LTD on" — a merchant name sometimes follows the VPA. */
     private val nameAfterVpaRe = Regex("""@[A-Za-z][A-Za-z0-9.]{1,30}\s+\(?([A-Z][A-Za-z&' .]{2,40}?)\)?$STOP""")
@@ -150,9 +161,13 @@ object PaymentParser {
         if (requireBankContext && !bankContextRe.containsMatchIn(all) && !smsSenderRe.matches(t)) return null
 
         val isCredit = when {
+            drYourAccountRe.containsMatchIn(all) -> false
+            crYourAccountRe.containsMatchIn(all) -> true
             strongDebitRe.containsMatchIn(all) -> false
             creditRe.containsMatchIn(all) -> true
             debitRe.containsMatchIn(all) -> false
+            drAloneRe.containsMatchIn(all) -> false
+            crAloneRe.containsMatchIn(all) -> true
             else -> return null
         }
         // Cashback / rewards notifications aren't payments you made or money you'd log.
@@ -211,7 +226,7 @@ object PaymentParser {
         upiInfoRe.find(all)?.let { m -> ok(m.groupValues[1])?.let { return it to PayeeQuality.NAME } }
 
         if (!isCredit) {
-            toVpaRe.find(all)?.let { m -> vpaName(m.groupValues[1])?.let { return it to PayeeQuality.VPA } }
+            toVpaRe.find(all)?.let { m -> return vpaLabel(m.groupValues[1]) to PayeeQuality.VPA }
             toNameRe.find(all)?.let { m ->
                 val raw = m.groupValues[1]
                 if (vpaRe.matches(raw.trim())) vpaName(raw.trim())?.let { return it to PayeeQuality.VPA }
@@ -226,14 +241,14 @@ object PaymentParser {
                 re.findAll(all).forEach { m -> ok(m.groupValues[1])?.takeIf { !looksLikeDate(it) }?.let { return it to PayeeQuality.NAME } }
             }
         } else {
-            fromVpaRe.find(all)?.let { m -> vpaName(m.groupValues[1])?.let { return it to PayeeQuality.VPA } }
+            fromVpaRe.find(all)?.let { m -> return vpaLabel(m.groupValues[1]) to PayeeQuality.VPA }
             fromNameRe.findAll(all).forEach { m ->
                 val raw = m.groupValues[1]
                 if (vpaRe.matches(raw.trim())) vpaName(raw.trim())?.let { return it to PayeeQuality.VPA }
                 ok(raw)?.let { return it to PayeeQuality.NAME }
             }
         }
-        vpaRe.find(all)?.let { m -> vpaName(m.groupValues[1])?.let { return it to PayeeQuality.VPA } }
+        vpaRe.find(all)?.let { m -> return vpaLabel(m.groupValues[1]) to PayeeQuality.VPA }
         // App notifications whose title is the person/merchant ("Rapido" / "₹66 paid").
         if (title.isNotEmpty() && !genericTitleRe.containsMatchIn(title)) ok(title)?.let { return it to PayeeQuality.NAME }
         return "Unknown" to PayeeQuality.UNKNOWN
@@ -242,6 +257,12 @@ object PaymentParser {
     private fun looksLikeDate(s: String) = Regex("""^\d|^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b""", RegexOption.IGNORE_CASE).containsMatchIn(s)
 
     /** "zomato@icici" → "Zomato"; "anu.sharma92@okaxis" → "Anu Sharma"; "paytmqr2810050501@paytm" → null. */
+    /** Readable name from a UPI ID, else the ID itself (sentence-ending dots trimmed). */
+    internal fun vpaLabel(raw: String): String {
+        val vpa = raw.trimEnd('.')
+        return vpaName(vpa) ?: vpa.lowercase()
+    }
+
     internal fun vpaName(vpa: String): String? {
         val local = vpa.substringBefore('@').lowercase()
         val prefix = Regex("""^(?:paytmqr|paytm-|bharatpe|q\d|upi|mab|gpay-|bpe)""")

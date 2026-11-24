@@ -120,11 +120,12 @@ class PaymentParserTest {
         assertEquals(PayeeQuality.VPA, r.payeeQuality)
     }
 
-    @Test fun merchantQrVpaFallsBackToUnknown() {
+    @Test fun merchantQrVpaKeepsTheUpiIdAsLabel() {
         val r = p("JM-BOBTXN", "Rs.40 debited from A/c XX5678 to VPA paytmqr2810050501xyz@paytm on 24-11-26 UPI Ref 4321", sms = true)
         assertNotNull(r)
         assertEquals(4000, r!!.amountPaise)
-        assertEquals(PayeeQuality.UNKNOWN, r.payeeQuality)
+        assertEquals("paytmqr2810050501xyz@paytm", r.payee)
+        assertEquals(PayeeQuality.VPA, r.payeeQuality)
     }
 
     // ---------------- Things to ignore ----------------
