@@ -93,6 +93,9 @@ fun AddEditSheet(
     var date by rememberSaveable { mutableStateOf(existing?.date ?: defaultDate ?: LocalDate.now()) }
     var place by rememberSaveable { mutableStateOf(existing?.place) }
     var goalId by rememberSaveable { mutableStateOf(existing?.goalId) }
+    // Own-account transfer: neither spend nor income. Refund: income that pays back an expense.
+    var isTransfer by rememberSaveable { mutableStateOf(existing?.isTransfer ?: false) }
+    var refundOf by rememberSaveable { mutableStateOf(existing?.refundOf) }
     // null = let the classifier decide ("Auto").
     var spendOverride by rememberSaveable { mutableStateOf(existing?.spendOverride) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -156,12 +159,13 @@ fun AddEditSheet(
             return
         }
         val cleanNote = note.trim()
+        val refund = refundOf?.takeIf { isIncome && !isTransfer && it > 0 }
         if (existing != null) {
             vm.update(existing.copy(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride,
                 time = time, place = place, lat = if (place == existing.place) existing.lat else null, lon = if (place == existing.place) existing.lon else null,
-                goalId = goalId))
+                goalId = goalId, isTransfer = isTransfer, refundOf = refund))
         } else {
-            vm.add(Expense(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride, place = place, time = time, goalId = goalId))
+            vm.add(Expense(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride, place = place, time = time, goalId = goalId, isTransfer = isTransfer, refundOf = refund))
         }
         close()
     }
@@ -186,15 +190,32 @@ fun AddEditSheet(
 
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 SegmentedButton(
-                    selected = !isIncome,
-                    onClick = { isIncome = false },
-                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                    selected = !isIncome && !isTransfer,
+                    onClick = { isIncome = false; isTransfer = false },
+                    shape = SegmentedButtonDefaults.itemShape(0, 3),
                 ) { Text("Expense") }
                 SegmentedButton(
-                    selected = isIncome,
-                    onClick = { isIncome = true },
-                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                    selected = isIncome && !isTransfer,
+                    onClick = { isIncome = true; isTransfer = false },
+                    shape = SegmentedButtonDefaults.itemShape(1, 3),
                 ) { Text("Received") }
+                SegmentedButton(
+                    selected = isTransfer,
+                    onClick = { isTransfer = true; isIncome = false; refundOf = null },
+                    shape = SegmentedButtonDefaults.itemShape(2, 3),
+                ) { Text("Transfer") }
+            }
+            if (isTransfer) {
+                Text(
+                    "Money moved between your own accounts — not counted as spend or income.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (isIncome && !isTransfer) {
+                Spacer(Modifier.height(6.dp))
+                RefundPicker(all, parsedAmount, note, date, refundOf, onChange = { refundOf = it })
             }
             Spacer(Modifier.height(12.dp))
 
@@ -308,7 +329,7 @@ fun AddEditSheet(
                 }
             }
 
-            if (!isIncome) {
+            if (!isIncome && !isTransfer) {
                 Spacer(Modifier.height(8.dp))
                 Text("Counts as", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

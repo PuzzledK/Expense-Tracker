@@ -112,7 +112,7 @@ object Insights {
         if (!prefs.getBoolean("insightsNotification", false) || !canNotify(ctx)) return
         CategoryRegistry.ensureLoaded(ctx)
         val db = ExpenseDb(ctx)
-        val all = try { db.all() } finally { db.close() }
+        val all = com.expensetracker.app.data.Ledger.counted(try { db.all() } finally { db.close() })
         val verdicts = SpendClassifier.classify(all)
         val info = HashMap<Long, SpendInfo>()
         all.forEachIndexed { i, e -> verdicts[i]?.let { info[e.id] = it } }
@@ -169,7 +169,7 @@ class InsightsReceiver : BroadcastReceiver() {
 /** Insights for the current data, computed off the main thread. */
 @Composable
 private fun rememberInsights(vm: ExpenseViewModel): List<Insight>? {
-    val expenses by vm.expenses.collectAsStateWithLifecycle()
+    val expenses by vm.counted.collectAsStateWithLifecycle()
     val info by vm.spendInfo.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val catVersion by CategoryRegistry.version.collectAsStateWithLifecycle()
@@ -217,7 +217,7 @@ fun InsightsScreen(vm: ExpenseViewModel, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val settings by vm.settings.collectAsStateWithLifecycle()
     val insights = rememberInsights(vm)
-    val expenses by vm.expenses.collectAsStateWithLifecycle()
+    val expenses by vm.counted.collectAsStateWithLifecycle()
     val info by vm.spendInfo.collectAsStateWithLifecycle()
     val weekly = remember(expenses, info) { InsightEngine.weekly(expenses, info, LocalDate.now()) }
 

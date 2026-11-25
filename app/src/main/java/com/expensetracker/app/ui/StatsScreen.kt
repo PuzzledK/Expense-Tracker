@@ -75,7 +75,10 @@ fun StatsScreen(
     onEdit: (Expense) -> Unit,
     onOpen: (Overlay) -> Unit = {},
 ) {
-    val all by vm.expenses.collectAsStateWithLifecycle()
+    val raw by vm.expenses.collectAsStateWithLifecycle()
+    // Totals use the counted view (refunds netted, transfers out); edits always get the real entry.
+    val all by vm.counted.collectAsStateWithLifecycle()
+    val onEdit: (Expense) -> Unit = { e -> onEdit(raw.firstOrNull { it.id == e.id } ?: e) }
     val settings by vm.settings.collectAsStateWithLifecycle()
     val spendInfo by vm.spendInfo.collectAsStateWithLifecycle()
     val excl = settings.excludeSavingsFromSpend
