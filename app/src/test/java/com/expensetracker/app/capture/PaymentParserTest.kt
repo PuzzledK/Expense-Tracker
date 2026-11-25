@@ -51,6 +51,7 @@ class PaymentParserTest {
 
     @Test fun receivedFrom() = credit(null, "₹500 received from Richa", 50000, "Richa")
     @Test fun gpayPaidYouTitle() = credit("Richa Sharma", "Paid you ₹500", 50000, "Richa Sharma")
+    @Test fun gpayPaidYouWholeTitle() = credit("RICHA KHATRI paid you ₹1.00", "Sent using Paytm UPI", 100, "Richa Khatri")
     @Test fun sentYou() = credit(null, "Mammi sent you ₹5,000", 500000, "Mammi")
     @Test fun refundFromMerchant() = credit("Refund", "Refund of ₹142 from Zomato has been credited to your account", 14200, "Zomato")
 

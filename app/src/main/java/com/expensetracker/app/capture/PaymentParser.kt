@@ -216,7 +216,10 @@ object PaymentParser {
 
         // "Richa sent you ₹500" / GPay "Richa · Paid you ₹500" (name in title).
         if (isCredit) {
-            sentYouRe.find(body)?.let { m -> ok(m.groupValues[1])?.let { return it to PayeeQuality.NAME } }
+            // GPay puts the whole line in the title ("RICHA KHATRI paid you ₹1.00" / "Sent using Paytm UPI").
+            for (line in listOf(body, title) + all.lines()) {
+                sentYouRe.find(line)?.let { m -> ok(m.groupValues[1])?.let { return it to PayeeQuality.NAME } }
+            }
             if (Regex("""\b(?:paid|sent) you\b""", RegexOption.IGNORE_CASE).containsMatchIn(body)) {
                 ok(title)?.takeIf { !genericTitleRe.containsMatchIn(title) }?.let { return it to PayeeQuality.NAME }
             }
