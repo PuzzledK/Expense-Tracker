@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
                     navigationBarStyle = if (dark) androidx.activity.SystemBarStyle.dark(t) else androidx.activity.SystemBarStyle.light(t, t),
                 )
             }
-            ExpenseTheme(themeId = settings.themeId, darkMode = settings.darkMode) {
+            ExpenseTheme(themeId = settings.themeId, darkMode = settings.darkMode, pureBlack = settings.pureBlack) {
                 val all by vm.expenses.collectAsStateWithLifecycle()
                 val home = remember(all, settings.homeCity) { Places.homeCity(all, settings) }
                 CompositionLocalProvider(LocalHomeCity provides home, LocalAppLock provides appLock) {

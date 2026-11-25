@@ -18,6 +18,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -242,7 +243,32 @@ fun buildStyle(theme: AppThemeId, dark: Boolean, scheme: ColorScheme): AppStyle 
     )
 }
 
-private fun schemeFor(theme: AppThemeId, dark: Boolean, ctx: Context): ColorScheme = when (theme) {
+/**
+ * AMOLED variant of a dark scheme: true-black background (pixels off), with each surface level
+ * pulled towards black but keeping a trace of the theme's tint so cards still read as cards.
+ */
+internal fun ColorScheme.pureBlack(): ColorScheme {
+    fun toward(c: Color, keep: Float) = lerp(Color.Black, c, keep)
+    return copy(
+        background = Color.Black,
+        surface = Color.Black,
+        surfaceDim = Color.Black,
+        surfaceContainerLowest = Color.Black,
+        surfaceContainerLow = toward(surfaceContainerLow, 0.45f),
+        surfaceContainer = toward(surfaceContainer, 0.55f),
+        surfaceContainerHigh = toward(surfaceContainerHigh, 0.6f),
+        surfaceContainerHighest = toward(surfaceContainerHighest, 0.65f),
+        surfaceVariant = toward(surfaceVariant, 0.6f),
+    )
+}
+
+private fun isPureBlack(ctx: Context) =
+    ctx.getSharedPreferences("settings", Context.MODE_PRIVATE).getBoolean("pureBlack", false)
+
+private fun schemeFor(theme: AppThemeId, dark: Boolean, ctx: Context, pureBlack: Boolean = isPureBlack(ctx)): ColorScheme =
+    baseSchemeFor(theme, dark, ctx).let { if (dark && pureBlack) it.pureBlack() else it }
+
+private fun baseSchemeFor(theme: AppThemeId, dark: Boolean, ctx: Context): ColorScheme = when (theme) {
     AppThemeId.DYNAMIC -> when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
         dark -> EvergreenDark
@@ -303,12 +329,12 @@ fun incomeColor(): Color = LocalAppStyle.current.income
  * screen); MainActivity passes live values so switching themes is instant.
  */
 @Composable
-fun ExpenseTheme(themeId: String? = null, darkMode: Int? = null, content: @Composable () -> Unit) {
+fun ExpenseTheme(themeId: String? = null, darkMode: Int? = null, pureBlack: Boolean? = null, content: @Composable () -> Unit) {
     val ctx = LocalContext.current
     val prefs = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
     val theme = AppThemeId.of(themeId ?: prefs.getString("themeId", null))
     val dark = isDarkFor(theme, darkMode ?: prefs.getInt("darkMode", DarkMode.SYSTEM))
-    val scheme = schemeFor(theme, dark, ctx)
+    val scheme = schemeFor(theme, dark, ctx, pureBlack ?: prefs.getBoolean("pureBlack", false))
     val style = buildStyle(theme, dark, scheme)
     CompositionLocalProvider(LocalAppStyle provides style) {
         MaterialTheme(colorScheme = scheme, typography = typographyFor(style), shapes = shapesFor(style), content = content)

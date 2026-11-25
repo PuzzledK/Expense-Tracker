@@ -93,6 +93,8 @@ data class Settings(
     val themeId: String = "classic",
     /** 0 = follow system, 1 = light, 2 = dark. */
     val darkMode: Int = 0,
+    /** AMOLED: true-black backgrounds whenever the app is dark. */
+    val pureBlack: Boolean = false,
 )
 
 /** A frequently repeated entry offered as a one-tap chip, e.g. "Lunch + Diet coke ₹142". */

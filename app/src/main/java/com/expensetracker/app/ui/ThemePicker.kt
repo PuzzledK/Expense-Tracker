@@ -38,7 +38,7 @@ import com.expensetracker.app.ui.kit.themedSurface
 
 /** Theme cards (each drawn in its own theme) + light/dark choice. */
 @Composable
-fun AppearanceSection(settings: Settings, onTheme: (String) -> Unit, onDarkMode: (Int) -> Unit) {
+fun AppearanceSection(settings: Settings, onTheme: (String) -> Unit, onDarkMode: (Int) -> Unit, onPureBlack: (Boolean) -> Unit) {
     val current = AppThemeId.of(settings.themeId)
     val dark = isDarkFor(current, settings.darkMode)
     LazyRow(
@@ -70,6 +70,21 @@ fun AppearanceSection(settings: Settings, onTheme: (String) -> Unit, onDarkMode:
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
+    }
+    Row(
+        Modifier.fillMaxWidth().clickable { onPureBlack(!settings.pureBlack) }.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Pure black (AMOLED)", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (dark) "True black in dark mode — saves battery on OLED screens"
+                else "Applies when the app is dark — saves battery on OLED screens",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        androidx.compose.material3.Switch(checked = settings.pureBlack, onCheckedChange = onPureBlack)
     }
 }
 

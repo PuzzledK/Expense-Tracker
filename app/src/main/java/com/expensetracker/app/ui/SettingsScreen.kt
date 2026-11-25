@@ -153,6 +153,7 @@ fun SettingsScreen(
                 settings = settings,
                 onTheme = { id -> vm.updateSettings { it.copy(themeId = id) } },
                 onDarkMode = { m -> vm.updateSettings { it.copy(darkMode = m) } },
+                onPureBlack = { on -> vm.updateSettings { it.copy(pureBlack = on) } },
             )
 
             HorizontalDivider()

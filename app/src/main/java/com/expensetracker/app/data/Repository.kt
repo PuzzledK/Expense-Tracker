@@ -26,6 +26,7 @@ class SettingsStore(context: Context) {
         insightsNotification = prefs.getBoolean("insightsNotification", false),
         themeId = prefs.getString("themeId", "classic") ?: "classic",
         darkMode = prefs.getInt("darkMode", 0),
+        pureBlack = prefs.getBoolean("pureBlack", false),
     )
 
     fun save(s: Settings) = prefs.edit {
@@ -47,6 +48,7 @@ class SettingsStore(context: Context) {
         putBoolean("insightsNotification", s.insightsNotification)
         putString("themeId", s.themeId)
         putInt("darkMode", s.darkMode)
+        putBoolean("pureBlack", s.pureBlack)
     }
 }
 
