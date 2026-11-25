@@ -38,6 +38,13 @@ android {
     }
 }
 
+// ./Expenses.apk is the file that gets installed on the phone: refresh it on every release build.
+val installedApk = rootProject.file("Expenses.apk")
+val releaseApk = layout.buildDirectory.file("outputs/apk/release/app-release.apk")
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    doLast { releaseApk.get().asFile.copyTo(installedApk, overwrite = true) }
+}
+
 dependencies {
     val bom = platform("androidx.compose:compose-bom:2026.06.01")
     implementation(bom)
