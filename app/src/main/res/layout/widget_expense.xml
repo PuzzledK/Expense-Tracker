@@ -1,71 +1,161 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Home-screen widget. Backgrounds are stacked white shapes that QuickLog.updateWidgets tints
+  with the app theme's colours (fill, border, neo-brutalist hard shadow), so the widget follows
+  whichever theme is picked in the app. The @color/widget_* tints are only the preview / first-draw
+  look before the app has drawn the widget once.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_bg"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingStart="18dp"
-    android:paddingEnd="12dp"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp">
+    android:layout_height="match_parent">
 
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+    <!-- Hard offset shadow (Neo-brutalism only). -->
+    <ImageView
+        android:id="@+id/widget_shadow"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="4dp"
+        android:layout_marginTop="4dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_fill_r6"
+        android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/widget_today_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:text="Today"
-            android:textColor="@color/widget_text_dim"
-            android:textSize="12sp" />
+    <FrameLayout
+        android:id="@+id/widget_card"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
-        <TextView
-            android:id="@+id/widget_today"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:text="₹0"
-            android:textColor="@color/widget_text"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+        <ImageView
+            android:id="@+id/widget_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_fill_r24"
+            android:tint="@color/widget_bg" />
 
-        <TextView
-            android:id="@+id/widget_month"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:text=""
-            android:textColor="@color/widget_text_dim"
-            android:textSize="12sp" />
-    </LinearLayout>
+        <ImageView
+            android:id="@+id/widget_border"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_stroke_r24"
+            android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/widget_bulk"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:layout_marginEnd="8dp"
-        android:background="@drawable/widget_button2_bg"
-        android:contentDescription="Add multiple"
-        android:gravity="center"
-        android:text="≡"
-        android:textColor="@color/widget_button2_fg"
-        android:textSize="22sp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp">
 
-    <TextView
-        android:id="@+id/widget_add"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
-        android:background="@drawable/widget_button_bg"
-        android:contentDescription="Quick log"
-        android:gravity="center"
-        android:text="+"
-        android:textColor="@color/widget_button_fg"
-        android:textSize="30sp" />
-</LinearLayout>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_today_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="Today"
+                    android:textColor="@color/widget_text_dim"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/widget_today"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="₹0"
+                    android:textColor="@color/widget_text"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_month"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text=""
+                    android:textColor="@color/widget_text_dim"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_bulk"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Add multiple">
+
+                <ImageView
+                    android:id="@+id/widget_bulk_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/widget_btn_fill_round"
+                    android:tint="@color/widget_button2_bg" />
+
+                <ImageView
+                    android:id="@+id/widget_bulk_border"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/widget_btn_stroke_round"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/widget_bulk_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:importantForAccessibility="no"
+                    android:text="≡"
+                    android:textColor="@color/widget_button2_fg"
+                    android:textSize="22sp" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_add"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:contentDescription="Quick log">
+
+                <ImageView
+                    android:id="@+id/widget_add_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/widget_btn_fill_round"
+                    android:tint="@color/widget_button_bg" />
+
+                <ImageView
+                    android:id="@+id/widget_add_border"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/widget_btn_stroke_round"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/widget_add_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:importantForAccessibility="no"
+                    android:text="+"
+                    android:textColor="@color/widget_button_fg"
+                    android:textSize="30sp" />
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

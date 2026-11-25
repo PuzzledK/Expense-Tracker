@@ -204,6 +204,7 @@ object QuickLog {
         if (ids.isEmpty()) return
         val monthName = LocalDate.now().month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
         val views = RemoteViews(ctx.packageName, R.layout.widget_expense).apply {
+            WidgetTheme.apply(ctx, this)
             val hidden = com.expensetracker.app.security.AppLock.isEnabled(ctx)
             setTextViewText(R.id.widget_today, if (hidden) "₹ •••" else rupees(s.todayPaise))
             setTextViewText(
