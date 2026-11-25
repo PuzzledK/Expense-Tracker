@@ -45,10 +45,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Search
 import com.expensetracker.app.ui.kit.AssistChip
+import com.expensetracker.app.ui.kit.FilterChip
+import com.expensetracker.app.data.CategoryRegistry
 import com.expensetracker.app.ui.kit.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -126,10 +130,14 @@ fun HomeScreen(
     var query by rememberSaveable { mutableStateOf("") }
     val searchFocus = remember { FocusRequester() }
 
+    var filterState by rememberSaveable { mutableStateOf("") }
+    val filter = remember(filterState) { ListFilter.decode(filterState) }
+    fun setFilter(f: ListFilter) { filterState = f.encode() }
+
     val today = LocalDate.now()
     val q = query.trim()
-    val visible = remember(expenses, month, q, searching) {
-        if (searching && q.isNotEmpty()) {
+    val visible = remember(expenses, month, q, searching, filter, spendInfo) {
+        val base = if (searching && q.isNotEmpty()) {
             expenses.filter {
                 it.note.contains(q, ignoreCase = true) || it.category.label.contains(q, ignoreCase = true) ||
                     it.place?.contains(q, ignoreCase = true) == true
@@ -137,6 +145,7 @@ fun HomeScreen(
         } else {
             expenses.filter { month.contains(it.date) }
         }
+        if (filter.active) base.filter { filter.matches(it, spendInfo) } else base
     }
     val grouped = remember(visible) {
         visible.groupBy { it.date }.toSortedMap(compareByDescending { it })
@@ -232,6 +241,7 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 160.dp),
         ) {
             if (searching && q.isNotEmpty()) {
+                item("filters") { ListFilterBar(filter, ::setFilter, expenses) }
                 item("search-summary") {
                     val total = visible.filter { !it.isIncome }.sumOf { it.amountPaise }
                     Text(
@@ -285,12 +295,16 @@ fun HomeScreen(
                         },
                     )
                 }
+                if (expenses.isNotEmpty()) {
+                    item("filters") { ListFilterBar(filter, ::setFilter, expenses) }
+                    if (filter.active && visible.isNotEmpty()) item("filter-summary") { FilterSummary(visible, filter) }
+                }
                 if (expenses.isEmpty()) {
                     item("empty") { EmptyState(onOpenImport) }
                 } else if (visible.isEmpty()) {
                     item("empty-month") {
                         Text(
-                            "Nothing logged in ${formatMonth(month)}.",
+                            if (filter.active) "Nothing in ${formatMonth(month)} matches these filters." else "Nothing logged in ${formatMonth(month)}.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(24.dp),
                         )
@@ -312,6 +326,81 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/** Chips over the list: spend kind (Everyday, One-off…) and a category multi-select. */
+@Composable
+private fun ListFilterBar(filter: ListFilter, onChange: (ListFilter) -> Unit, all: List<Expense>) {
+    var menu by remember { mutableStateOf(false) }
+    // Categories you've actually used (plus any still selected), in your category order.
+    val used = remember(all) { all.mapTo(HashSet()) { it.category.id } }
+    val cats = CategoryRegistry.allInfo().filter { it.id in used || it.id in filter.categories }
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        item("cat") {
+            Box {
+                val sel = filter.categories
+                FilterChip(
+                    selected = sel.isNotEmpty(),
+                    onClick = { menu = true },
+                    label = {
+                        Text(
+                            when (sel.size) {
+                                0 -> "Category"
+                                1 -> CategoryRegistry.info(sel.first()).let { "${it.emoji} ${it.label}" }
+                                else -> "${sel.size} categories"
+                            },
+                            maxLines = 1,
+                        )
+                    },
+                    trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.size(18.dp)) },
+                )
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    if (sel.isNotEmpty()) {
+                        DropdownMenuItem(text = { Text("All categories") }, onClick = { onChange(filter.copy(categories = emptySet())); menu = false })
+                        HorizontalDivider()
+                    }
+                    cats.forEach { c ->
+                        val on = c.id in sel
+                        DropdownMenuItem(
+                            text = { Text("${c.emoji} ${c.label}") },
+                            trailingIcon = { if (on) Icon(Icons.Filled.Check, contentDescription = "Selected") },
+                            // Stays open so you can pick several.
+                            onClick = { onChange(filter.copy(categories = if (on) sel - c.id else sel + c.id)) },
+                        )
+                    }
+                }
+            }
+        }
+        items(KindFilter.entries, key = { it.name }) { k ->
+            FilterChip(
+                selected = filter.kind == k,
+                onClick = { onChange(filter.copy(kind = if (filter.kind == k) KindFilter.ALL else k)) },
+                label = { Text(k.label) },
+            )
+        }
+        if (filter.active) item("clear") {
+            TextButton(onClick = { onChange(ListFilter()) }) { Text("Clear") }
+        }
+    }
+}
+
+/** "14 entries · ₹3,450 · ₹115/day" for the filtered list. */
+@Composable
+private fun FilterSummary(list: List<Expense>, filter: ListFilter) {
+    val income = filter.kind == KindFilter.INCOME
+    val total = list.filter { it.isIncome == income }.sumOf { it.amountPaise }
+    val days = list.mapTo(HashSet()) { it.date }.size
+    val perDay = if (!income && days > 0) " · ${formatRupeesWhole(total / days)}/day on days with spend" else ""
+    Text(
+        "${list.size} ${if (list.size == 1) "entry" else "entries"} · ${if (income) "+" else ""}${formatRupees(total)}$perDay",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }
 
 /** Removes an entry that was just added. The returned Expense may not carry the DB id yet. */
