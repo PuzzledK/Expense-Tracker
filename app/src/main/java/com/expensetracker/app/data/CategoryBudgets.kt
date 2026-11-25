@@ -48,9 +48,10 @@ object CategoryBudgets {
         }.toMap()
     }
 
-    /** Spending per category id in [month] (income never counts; savings only if not excluded). */
+    /** Spending per category id in [month] (income never counts; savings only if not excluded).
+     *  Goes through [Ledger.counted]: transfers don't count and refunds reduce what they pay back. */
     fun spent(expenses: List<Expense>, month: YearMonth, excludeSavings: Boolean): Map<String, Long> =
-        expenses.asSequence()
+        Ledger.counted(expenses).asSequence()
             .filter { !it.isIncome && !(excludeSavings && it.category == Category.SAVINGS) }
             .filter { it.date.year == month.year && it.date.month == month.month }
             .groupBy { it.category.id }

@@ -105,4 +105,12 @@ class CategoryBudgetsTest {
         val kept = BackupIo.parse(old).settingsPatch!!(Settings(categoryBudgets = mapOf("SHOPPING" to 1L)))
         assertEquals(mapOf("SHOPPING" to 1L), kept.categoryBudgets)
     }
+
+    @Test fun refundsAndTransfersFollowTheLedger() {
+        val m = java.time.YearMonth.of(2026, 11)
+        val shoe = e(2000, Category.SHOPPING).copy(id = 1)
+        val refund = e(500, Category.SHOPPING, income = true).copy(id = 2, refundOf = 1)
+        val move = e(9000, Category.SHOPPING).copy(id = 3, isTransfer = true)
+        assertEquals(mapOf(Category.SHOPPING.id to 1500_00L), CategoryBudgets.spent(listOf(shoe, refund, move), m, excludeSavings = false))
+    }
 }

@@ -47,7 +47,7 @@ object SubscriptionDetector {
 
     /** Notes that recur roughly monthly across 3+ months at a steady amount. Spends only. */
     internal fun recurringGroups(spends: List<Expense>): List<Group> =
-        spends.filter { !it.isIncome && it.category !in CONSUMABLES }
+        spends.filter { !it.isIncome && !it.isTransfer && it.category !in CONSUMABLES }
             .groupBy { noteKey(it.note) }
             .filterKeys { it.isNotEmpty() }
             .mapNotNull { (key, items) ->
