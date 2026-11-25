@@ -73,6 +73,17 @@ fun formatRupeesShort(paise: Long): String {
     }
 }
 
+/** Tighter than [formatRupeesShort] for narrow chart columns: ₹46k, ₹6.4k, ₹1.2L, ₹950. */
+fun formatRupeesCompact(paise: Long): String {
+    val r = paise / 100.0
+    return when {
+        r >= 100_000 -> "₹" + trim1(r / 100_000) + "L"
+        r >= 10_000 -> "₹" + Math.round(r / 1_000) + "k"
+        r >= 1_000 -> "₹" + trim1(r / 1_000) + "k"
+        else -> "₹" + Math.round(r)
+    }
+}
+
 private fun trim1(d: Double): String {
     val s = String.format(Locale.US, "%.1f", d)
     return if (s.endsWith(".0")) s.dropLast(2) else s

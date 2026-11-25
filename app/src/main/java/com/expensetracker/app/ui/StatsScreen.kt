@@ -2,6 +2,15 @@
 
 package com.expensetracker.app.ui
 
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -119,6 +128,8 @@ fun StatsScreen(
     }
     val top5 = remember(spendInMonth) { spendInMonth.sortedByDescending { it.amountPaise }.take(5) }
 
+    val scroll = rememberScrollState()
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Stats", fontWeight = FontWeight.SemiBold) }) },
         bottomBar = bottomBar,
@@ -127,7 +138,7 @@ fun StatsScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(bottom = 24.dp),
         ) {
             MonthSelector(month, onMonthChange, Modifier.padding(horizontal = 4.dp))
@@ -229,7 +240,7 @@ fun StatsScreen(
             }
 
             SectionCard("Last 12 months") {
-                MonthBars(lastMonths, selected = month, onSelect = onMonthChange)
+                MonthBars(lastMonths, selected = month, onSelect = onMonthChange, scroll = scroll)
             }
 
             SectionCard("Biggest expenses") {
@@ -373,25 +384,55 @@ private fun DailyBars(daily: LongArray, month: YearMonth, avg: Long) {
 }
 
 @Composable
-private fun MonthBars(data: List<Pair<YearMonth, Long>>, selected: YearMonth, onSelect: (YearMonth) -> Unit) {
+private fun MonthBars(data: List<Pair<YearMonth, Long>>, selected: YearMonth, onSelect: (YearMonth) -> Unit, scroll: ScrollState) {
     val max = (data.maxOfOrNull { it.second } ?: 0L).coerceAtLeast(1L)
     val barColor = MaterialTheme.colorScheme.primary
     val dim = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
     val avgNonZero = data.map { it.second }.filter { it > 0 }.let { if (it.isEmpty()) 0L else it.sum() / it.size }
+
+    // Tapping a bar opens that month, which resizes the sections above this chart. Keep the
+    // chart where it was on screen: note its position before the switch, then scroll by
+    // however far it moved once the new month has been laid out.
+    val chartY = remember { floatArrayOf(0f) }
+    var anchor by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(selected) {
+        val a = anchor ?: return@LaunchedEffect
+        withFrameNanos { }
+        val moved = chartY[0] - a
+        if (moved != 0f) scroll.scrollBy(moved)
+        anchor = null
+    }
+
+    Column(Modifier.onGloballyPositioned { chartY[0] = it.positionInRoot().y }) {
     Text(
-        "Average ${formatRupees(avgNonZero)}/month (months with entries) · tap to open",
+        "Average ${formatRupeesWhole(avgNonZero)}/month (months with entries) · tap a bar to open",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    data.firstOrNull { it.first == selected }?.let { (ym, v) ->
+        Text(
+            "${formatMonth(ym)}: ${formatRupeesWhole(v)}",
+            style = LocalAppStyle.current.money(MaterialTheme.typography.titleSmall),
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
     Spacer(Modifier.height(8.dp))
+    // One label per bar: whole-number compact amounts, shrunk to fit the bar's column.
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     Row(Modifier.fillMaxWidth()) {
-        data.forEach { (_, v) ->
-            Text(
-                if (v > 0) formatRupeesShort(v) else "",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
+        data.forEach { (ym, v) ->
+            BasicText(
+                if (v > 0) formatRupeesCompact(v) else "",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    letterSpacing = 0.sp,
+                    textAlign = TextAlign.Center,
+                    color = if (ym == selected) MaterialTheme.colorScheme.onSurface else labelColor,
+                    fontWeight = if (ym == selected) FontWeight.Bold else FontWeight.Normal,
+                ),
                 maxLines = 1,
+                softWrap = false,
+                autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 11.sp, stepSize = 0.5.sp),
+                modifier = Modifier.weight(1f).padding(horizontal = 1.dp),
             )
         }
     }
@@ -402,7 +443,10 @@ private fun MonthBars(data: List<Pair<YearMonth, Long>>, selected: YearMonth, on
             .pointerInput(data) {
                 detectTapGestures { pos ->
                     val i = (pos.x / (size.width / data.size.toFloat())).toInt().coerceIn(0, data.lastIndex)
-                    onSelect(data[i].first)
+                    if (data[i].first != selected) {
+                        anchor = chartY[0]
+                        onSelect(data[i].first)
+                    }
                 }
             },
     ) {
@@ -428,6 +472,7 @@ private fun MonthBars(data: List<Pair<YearMonth, Long>>, selected: YearMonth, on
                 fontWeight = if (ym == selected) FontWeight.Bold else FontWeight.Normal,
             )
         }
+    }
     }
 }
 
