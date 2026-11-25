@@ -5,4 +5,11 @@
     <string name="quick_log_label">Quick log</string>
     <string name="shortcut_add_short">Add expense</string>
     <string name="shortcut_add_long">Add an expense</string>
+    <string name="shortcut_income_short">Add income</string>
+    <string name="shortcut_income_long">Add money received</string>
+    <string name="shortcut_bulk_short">Bulk add</string>
+    <string name="shortcut_bulk_long">Add several entries</string>
+    <string name="shortcut_review_short">Review captured</string>
+    <string name="shortcut_review_long">Review captured payments</string>
+    <string name="tile_log_label">Log expense</string>
 </resources>

@@ -107,6 +107,7 @@ object QuickLog {
         val s = summary(all)
         if (isEnabled(ctx)) showNotification(ctx, s, status)
         updateWidgets(ctx, s)
+        QuickLogTileService.requestRefresh(ctx)
     }
 
     fun refreshAsync(ctx: Context, status: String? = null) {

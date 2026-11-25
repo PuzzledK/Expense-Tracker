@@ -76,6 +76,8 @@ fun AddEditSheet(
     defaultDate: LocalDate?,
     onDismiss: () -> Unit,
     onDeleted: (Expense) -> Unit,
+    /** New entry starts as income (the "Add income" shortcut). */
+    startIncome: Boolean = false,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -87,7 +89,7 @@ fun AddEditSheet(
     var note by rememberSaveable { mutableStateOf(existing?.note ?: "") }
     var category by rememberSaveable { mutableStateOf(existing?.category ?: Category.FOOD) }
     var categoryPicked by rememberSaveable { mutableStateOf(existing != null) }
-    var isIncome by rememberSaveable { mutableStateOf(existing?.isIncome ?: false) }
+    var isIncome by rememberSaveable { mutableStateOf(existing?.isIncome ?: startIncome) }
     var date by rememberSaveable { mutableStateOf(existing?.date ?: defaultDate ?: LocalDate.now()) }
     var place by rememberSaveable { mutableStateOf(existing?.place) }
     var goalId by rememberSaveable { mutableStateOf(existing?.goalId) }

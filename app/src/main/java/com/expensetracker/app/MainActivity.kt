@@ -25,6 +25,8 @@ class MainActivity : ComponentActivity() {
     private val openAddRequests = mutableIntStateOf(0)
     /** Same for the "Add multiple" sheet (notification action / widget ≡ button). */
     private val openBulkRequests = mutableIntStateOf(0)
+    /** "Add income" app shortcut: opens the add sheet already switched to income. */
+    private val openIncomeRequests = mutableIntStateOf(0)
     /** Feature screen a notification wants opened (capture review, backup settings). */
     private val overlayRequest = androidx.compose.runtime.mutableStateOf<com.expensetracker.app.ui.Overlay?>(null)
     private val vm: ExpenseViewModel by viewModels()
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
                             vm = vm,
                             openAddRequests = openAddRequests.intValue,
                             openBulkRequests = openBulkRequests.intValue,
+                            openIncomeRequests = openIncomeRequests.intValue,
                             overlayRequest = overlayRequest.value,
                             onOverlayRequestHandled = { overlayRequest.value = null },
                         )
@@ -101,30 +104,23 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
-        // Shortcut XML delivers extras as strings; notifications deliver a boolean.
         @Suppress("DEPRECATION")
-        val flag = intent.extras?.get(EXTRA_OPEN_ADD)
-        if (intent.action == ACTION_ADD || flag == true || flag == "true") {
-            openAddRequests.intValue++
-            intent.removeExtra(EXTRA_OPEN_ADD)
+        val routes = LaunchRoute.of(intent.action) { intent.extras?.get(it) }
+        for (r in routes) when (r) {
+            LaunchRoute.ADD_EXPENSE -> openAddRequests.intValue++
+            LaunchRoute.ADD_INCOME -> openIncomeRequests.intValue++
+            LaunchRoute.BULK -> openBulkRequests.intValue++
+            LaunchRoute.REVIEW_CAPTURE -> overlayRequest.value = com.expensetracker.app.ui.Overlay.CAPTURE
+            LaunchRoute.BACKUP -> overlayRequest.value = com.expensetracker.app.ui.Overlay.BACKUP
         }
-        if (intent.getBooleanExtra(com.expensetracker.app.capture.CaptureNotifier.EXTRA_OPEN_CAPTURE, false)) {
-            overlayRequest.value = com.expensetracker.app.ui.Overlay.CAPTURE
-            intent.removeExtra(com.expensetracker.app.capture.CaptureNotifier.EXTRA_OPEN_CAPTURE)
-        }
-        if (intent.getBooleanExtra(com.expensetracker.app.backup.AutoBackup.EXTRA_OPEN_BACKUP, false)) {
-            overlayRequest.value = com.expensetracker.app.ui.Overlay.BACKUP
-            intent.removeExtra(com.expensetracker.app.backup.AutoBackup.EXTRA_OPEN_BACKUP)
-        }
-        if (intent.getBooleanExtra(EXTRA_OPEN_BULK, false)) {
-            openBulkRequests.intValue++
-            intent.removeExtra(EXTRA_OPEN_BULK)
-        }
+        LaunchRoute.EXTRAS.forEach(intent::removeExtra)
+        // Handled: a re-created activity (rotation, process restore) mustn't replay the shortcut.
+        if (routes.isNotEmpty()) intent.action = Intent.ACTION_MAIN
     }
 
     companion object {
-        const val EXTRA_OPEN_ADD = "open_add"
-        const val EXTRA_OPEN_BULK = "open_bulk"
-        const val ACTION_ADD = "com.expensetracker.app.action.ADD_EXPENSE"
+        const val EXTRA_OPEN_ADD = LaunchRoute.EXTRA_OPEN_ADD
+        const val EXTRA_OPEN_BULK = LaunchRoute.EXTRA_OPEN_BULK
+        const val ACTION_ADD = LaunchRoute.ACTION_ADD
     }
 }

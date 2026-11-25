@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon. Each is routed by its action in LaunchRoute (MainActivity). -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:shortcutId="add_expense"
@@ -12,5 +13,38 @@
             android:targetClass="com.expensetracker.app.MainActivity">
             <extra android:name="open_add" android:value="true" />
         </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="add_income"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_income"
+        android:shortcutShortLabel="@string/shortcut_income_short"
+        android:shortcutLongLabel="@string/shortcut_income_long">
+        <intent
+            android:action="com.expensetracker.app.action.ADD_INCOME"
+            android:targetPackage="com.expensetracker.app"
+            android:targetClass="com.expensetracker.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="bulk_add"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_bulk"
+        android:shortcutShortLabel="@string/shortcut_bulk_short"
+        android:shortcutLongLabel="@string/shortcut_bulk_long">
+        <intent
+            android:action="com.expensetracker.app.action.BULK_ADD"
+            android:targetPackage="com.expensetracker.app"
+            android:targetClass="com.expensetracker.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="review_captured"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_review"
+        android:shortcutShortLabel="@string/shortcut_review_short"
+        android:shortcutLongLabel="@string/shortcut_review_long">
+        <intent
+            android:action="com.expensetracker.app.action.REVIEW_CAPTURED"
+            android:targetPackage="com.expensetracker.app"
+            android:targetClass="com.expensetracker.app.MainActivity" />
     </shortcut>
 </shortcuts>

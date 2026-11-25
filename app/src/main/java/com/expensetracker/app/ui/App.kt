@@ -58,6 +58,8 @@ enum class Overlay { CATEGORIES, GOALS, INSIGHTS, CAPTURE, BACKUP }
 sealed interface SheetState {
     data object Closed : SheetState
     data object Adding : SheetState
+    /** Adding, starting on income (the "Add income" shortcut). */
+    data object AddingIncome : SheetState
     data class Editing(val expense: Expense) : SheetState
     data class Bulk(val date: java.time.LocalDate) : SheetState
 
@@ -66,6 +68,7 @@ sealed interface SheetState {
         fun encode(s: SheetState): String = when (s) {
             Closed -> ""
             Adding -> "add"
+            AddingIncome -> "income"
             is Bulk -> "bulk:${s.date}"
             is Editing -> "edit:${s.expense.id}"
         }
@@ -73,6 +76,7 @@ sealed interface SheetState {
         /** Back from [encode]; an edited entry is looked up by id (gone since → closed). */
         fun decode(text: String, find: (Long) -> Expense?): SheetState = when {
             text == "add" -> Adding
+            text == "income" -> AddingIncome
             text.startsWith("bulk:") -> runCatching { Bulk(java.time.LocalDate.parse(text.removePrefix("bulk:"))) }.getOrDefault(Closed)
             text.startsWith("edit:") -> text.removePrefix("edit:").toLongOrNull()?.let(find)?.let { Editing(it) } ?: Closed
             else -> Closed
@@ -85,6 +89,7 @@ fun ExpenseApp(
     vm: ExpenseViewModel,
     openAddRequests: Int,
     openBulkRequests: Int = 0,
+    openIncomeRequests: Int = 0,
     /** A notification asked to open this screen; call [onOverlayRequestHandled] once shown. */
     overlayRequest: Overlay? = null,
     onOverlayRequestHandled: () -> Unit = {},
@@ -123,6 +128,16 @@ fun ExpenseApp(
     // the lock screen (which re-creates this screen) doesn't replay an old one.
     var handledAdd by rememberSaveable { mutableIntStateOf(0) }
     var handledBulk by rememberSaveable { mutableIntStateOf(0) }
+    var handledIncome by rememberSaveable { mutableIntStateOf(0) }
+
+    LaunchedEffect(openIncomeRequests) {
+        if (openIncomeRequests > handledIncome) {
+            handledIncome = openIncomeRequests
+            tab = Tab.HOME
+            showImport = false
+            sheet = SheetState.AddingIncome
+        }
+    }
 
     LaunchedEffect(openAddRequests) {
         if (openAddRequests > handledAdd) {
@@ -252,9 +267,10 @@ fun ExpenseApp(
 
     when (val s = sheet) {
         SheetState.Closed -> Unit
-        SheetState.Adding -> AddEditSheet(
+        SheetState.Adding, SheetState.AddingIncome -> AddEditSheet(
             vm = vm,
             existing = null,
+            startIncome = s == SheetState.AddingIncome,
             defaultDate = if (month == YearMonth.now()) null else month.atDay(1),
             onDismiss = { sheet = SheetState.Closed },
             onDeleted = { showDeletedSnackbar(it) },
