@@ -140,6 +140,42 @@ object PaymentParser {
     private val maskedRe = Regex("""\b(?:a/c|acct|account)\b|\bxx\d|\*\d|\bcard (?:no|ending|xx)""", RegexOption.IGNORE_CASE)
     private val genericTitleRe = Regex("""payment|paid|sent|received|success|transaction|debited|credited|alert|money|upi|google pay|phonepe|paytm|bhim|cred|amazon|bank|₹|\brs\b|^\s*$|[A-Z]{2}-[A-Z0-9]{3,9}""", RegexOption.IGNORE_CASE)
 
+    /** Title + text as one string, the way every rule sees it. */
+    internal fun combined(title: String?, text: String?): String {
+        val t = title.orEmpty().trim()
+        val body = text.orEmpty().trim()
+        // A title that is just a phone number / short code (SMS sender) carries no payment info.
+        val titleUseful = t.isNotEmpty() && !Regex("""^\+?[\d\s-]{3,15}$""").matches(t)
+        return (if (titleUseful && !body.contains(t, ignoreCase = true)) "$t\n$body" else body)
+            .replace(' ', ' ')
+            .replace(Regex("[ \t]+"), " ")
+    }
+
+    /**
+     * Money didn't move (OTP, failed/pending payment, collect request). Never a payment, whatever
+     * the learning model thinks.
+     */
+    fun isHardReject(title: String?, text: String?): Boolean {
+        val all = combined(title, text)
+        return otpRe.containsMatchIn(all) || failedRe.containsMatchIn(all) || requestRe.containsMatchIn(all)
+    }
+
+    /** Bank SMS look: account / UPI / reference words, or a bank sender ID like "AX-HDFCBK". */
+    fun looksLikeBank(title: String?, text: String?): Boolean =
+        bankContextRe.containsMatchIn(combined(title, text)) || smsSenderRe.matches(title.orEmpty().trim())
+
+    /** Money in (true), out (false), or no direction words (null). */
+    private fun direction(all: String): Boolean? = when {
+        drYourAccountRe.containsMatchIn(all) -> false
+        crYourAccountRe.containsMatchIn(all) -> true
+        strongDebitRe.containsMatchIn(all) -> false
+        creditRe.containsMatchIn(all) -> true
+        debitRe.containsMatchIn(all) -> false
+        drAloneRe.containsMatchIn(all) -> false
+        crAloneRe.containsMatchIn(all) -> true
+        else -> null
+    }
+
     /**
      * @param requireBankContext true for SMS apps: only bank-looking messages count.
      */
@@ -147,11 +183,7 @@ object PaymentParser {
         val t = title.orEmpty().trim()
         val body = text.orEmpty().trim()
         if (body.isEmpty() && t.isEmpty()) return null
-        // A title that is just a phone number / short code (SMS sender) carries no payment info.
-        val titleUseful = t.isNotEmpty() && !Regex("""^\+?[\d\s-]{3,15}$""").matches(t)
-        val all = (if (titleUseful && !body.contains(t, ignoreCase = true)) "$t\n$body" else body)
-            .replace(' ', ' ')
-            .replace(Regex("[ \t]+"), " ")
+        val all = combined(title, text)
 
         if (otpRe.containsMatchIn(all)) return null
         if (failedRe.containsMatchIn(all)) return null
@@ -162,22 +194,31 @@ object PaymentParser {
         if (requestRe.containsMatchIn(all)) return null
         if (requireBankContext && !bankContextRe.containsMatchIn(all) && !smsSenderRe.matches(t)) return null
 
-        val isCredit = when {
-            drYourAccountRe.containsMatchIn(all) -> false
-            crYourAccountRe.containsMatchIn(all) -> true
-            strongDebitRe.containsMatchIn(all) -> false
-            creditRe.containsMatchIn(all) -> true
-            debitRe.containsMatchIn(all) -> false
-            drAloneRe.containsMatchIn(all) -> false
-            crAloneRe.containsMatchIn(all) -> true
-            else -> return null
-        }
+        val isCredit = direction(all) ?: return null
         // Cashback / rewards notifications aren't payments you made or money you'd log.
         if (cashbackRe.containsMatchIn(all) && (isCredit || !debitRe.containsMatchIn(all))) return null
 
         val amount = findAmount(all) ?: return null
         if (amount <= 0) return null
 
+        val (payee, quality) = findPayee(all, t, body, isCredit)
+        val account = accountRe.find(all)?.groupValues?.get(1)?.replace(" ", "")?.uppercase()?.replace('*', 'X')
+        return ParsedPayment(amount, payee, isCredit, quality, account)
+    }
+
+    /**
+     * Best-effort reading with the cautious rules switched off (offers, reminders, bank-context,
+     * missing direction words…), for messages the learning model says are payments anyway.
+     * Hard rejects ([isHardReject]) still return null. No direction words → money out.
+     */
+    fun parseLoose(title: String?, text: String?): ParsedPayment? {
+        val t = title.orEmpty().trim()
+        val body = text.orEmpty().trim()
+        if (body.isEmpty() && t.isEmpty()) return null
+        if (isHardReject(title, text)) return null
+        val all = combined(title, text)
+        val isCredit = direction(all) ?: false
+        val amount = findAmount(all)?.takeIf { it > 0 } ?: return null
         val (payee, quality) = findPayee(all, t, body, isCredit)
         val account = accountRe.find(all)?.groupValues?.get(1)?.replace(" ", "")?.uppercase()?.replace('*', 'X')
         return ParsedPayment(amount, payee, isCredit, quality, account)

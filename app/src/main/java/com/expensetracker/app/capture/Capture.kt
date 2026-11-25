@@ -31,6 +31,8 @@ data class CapturedPayment(
     val sourcePackage: String = "",
     /** Masked account/card ("XX1234") if the notification named one. */
     val account: String? = null,
+    /** How it was read: regex rules, a format you taught, or rescued as unsure (see [ParserModel]). */
+    val origin: ParserModel.Origin = ParserModel.Origin.REGEX,
 )
 
 /**
@@ -45,6 +47,15 @@ object CaptureStore {
     private val _pending = MutableStateFlow<List<CapturedPayment>>(emptyList())
     /** Payments awaiting review, newest first. */
     val pending: StateFlow<List<CapturedPayment>> = _pending
+
+    private val _hidden = MutableStateFlow<List<CapturedPayment>>(emptyList())
+    /** Drafts the learning model filtered out as not payments (last 7 days), newest first. */
+    val hidden: StateFlow<List<CapturedPayment>> = _hidden
+
+    /** "12 formats learned from 40 reviews"; refreshed with the lists. */
+    data class LearningStats(val formats: Int, val examples: Int)
+    private val _learning = MutableStateFlow(LearningStats(0, 0))
+    val learning: StateFlow<LearningStats> = _learning
 
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "capture-io").apply { isDaemon = true } }
     @Volatile private var db: CaptureDb? = null
@@ -71,6 +82,8 @@ object CaptureStore {
             }
         }
         _pending.value = list
+        _hidden.value = d.hidden()
+        ParserLearning.model(ctx).let { _learning.value = LearningStats(it.formatsLearned, it.examples) }
         CaptureNotifier.sync(ctx, list)
     }
 
@@ -91,8 +104,18 @@ object CaptureStore {
     }
 
     private fun ingestNow(ctx: Context, pkg: String, source: CaptureSource, title: String?, text: String?, atMillis: Long) {
-        // Text that doesn't parse as a payment is dropped here and never stored.
-        val parsed = PaymentParser.parse(title, text, requireBankContext = source.group == SourceGroup.SMS) ?: return
+        // Text that isn't a payment is dropped here and never stored. The regex rules read it first;
+        // the learning model can correct that reading, rescue a rejected one, or hide junk.
+        val sms = source.group == SourceGroup.SMS
+        val regex = PaymentParser.parse(title, text, requireBankContext = sms)
+        val decision = try {
+            ParserLearning.model(ctx).decide(source.group.name, title, text, regex, requireBankContext = sms)
+        } catch (e: Exception) {
+            Log.w(TAG, "learning model failed; using the regex reading", e)
+            regex?.let { ParserModel.Decision.Draft(it, ParserModel.Origin.REGEX, hidden = false) } ?: ParserModel.Decision.Drop
+        }
+        if (decision !is ParserModel.Decision.Draft) return
+        val parsed = decision.payment
         val d = db(ctx)
         val fp = CaptureDedupe.fingerprint(pkg, title, text)
         val nearby = d.around(atMillis - CaptureDedupe.WINDOW_MS, atMillis + CaptureDedupe.WINDOW_MS, fp)
@@ -106,7 +129,11 @@ object CaptureStore {
             reloadNow(ctx, checkManual = false)
             return
         }
-        val id = d.insert(parsed, atMillis, pkg, source.label, raw, fp)
+        val id = d.insert(parsed, atMillis, pkg, source.label, raw, fp, decision.origin, decision.hidden)
+        if (decision.hidden) {
+            reloadNow(ctx, checkManual = false)
+            return
+        }
         // Already logged by hand? Keep a (text-less) dismissed row so the bank SMS etc. merge into it.
         if (CaptureDedupe.matchesManual(manualExpenses(ctx, d), parsed.amountPaise, parsed.isCredit, atMillis)) {
             d.setStatus(id, CaptureDb.Status.DISMISSED)
@@ -116,23 +143,49 @@ object CaptureStore {
         if (CapturePrefs.notifyOnCapture(ctx)) CaptureNotifier.show(ctx, _pending.value, newest = d.get(id)?.payment)
     }
 
-    /** Mark confirmed after the expense was saved; [expenseCreatedAt] is the saved expense's createdAt. */
-    fun confirm(ctx: Context, p: CapturedPayment, expenseCreatedAt: Long) {
+    /**
+     * Mark confirmed after the expense was saved; [expenseCreatedAt] is the saved expense's createdAt.
+     * [amountPaise], [isIncome] and [note] are what you saved: the parser learns from any difference.
+     */
+    fun confirm(ctx: Context, p: CapturedPayment, expenseCreatedAt: Long, amountPaise: Long = p.amountPaise, isIncome: Boolean = p.isIncome, note: String = p.payee) {
         _pending.value = _pending.value.filterNot { it.id == p.id }
         val app = ctx.applicationContext
-        io.execute { safely { db(app).setStatus(p.id, CaptureDb.Status.CONFIRMED, expenseCreatedAt); reloadNow(app, checkManual = false) } }
+        io.execute {
+            safely { ParserLearning.learnPayment(app, p, amountPaise, isIncome, note) }
+            safely { db(app).setStatus(p.id, CaptureDb.Status.CONFIRMED, expenseCreatedAt); reloadNow(app, checkManual = false) }
+        }
     }
 
-    fun dismiss(ctx: Context, p: CapturedPayment) {
+    /** [notPayment] = you said it isn't a payment at all (teaches the model); false = duplicate / already logged. */
+    fun dismiss(ctx: Context, p: CapturedPayment, notPayment: Boolean = false) {
         _pending.value = _pending.value.filterNot { it.id == p.id }
         val app = ctx.applicationContext
-        io.execute { safely { db(app).setStatus(p.id, CaptureDb.Status.DISMISSED); reloadNow(app, checkManual = false) } }
+        io.execute {
+            if (notPayment) safely { ParserLearning.learnNotPayment(app, p) }
+            safely { db(app).setStatus(p.id, CaptureDb.Status.DISMISSED); reloadNow(app, checkManual = false) }
+        }
     }
 
     /** Undo for [dismiss]; [p] still carries the text, so it comes back as it was. */
-    fun undoDismiss(ctx: Context, p: CapturedPayment) {
+    fun undoDismiss(ctx: Context, p: CapturedPayment, notPayment: Boolean = false) {
+        val app = ctx.applicationContext
+        io.execute {
+            if (notPayment) safely { ParserLearning.unlearnNotPayment(app, p) }
+            safely { db(app).restore(p); reloadNow(app, checkManual = false) }
+        }
+    }
+
+    /** "It's a payment": a hidden draft goes back to the inbox (you then confirm it, which teaches the model). */
+    fun unhide(ctx: Context, p: CapturedPayment) {
+        _hidden.value = _hidden.value.filterNot { it.id == p.id }
         val app = ctx.applicationContext
         io.execute { safely { db(app).restore(p); reloadNow(app, checkManual = false) } }
+    }
+
+    /** Forget everything the parser learned (formats and the payment classifier). */
+    fun resetLearning(ctx: Context) {
+        val app = ctx.applicationContext
+        io.execute { safely { ParserLearning.reset(app); reloadNow(app, checkManual = false) } }
     }
 
     private inline fun safely(block: () -> Unit) {

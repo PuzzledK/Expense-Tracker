@@ -2,6 +2,12 @@
 
 package com.expensetracker.app.capture
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.text.input.KeyboardType
+import com.expensetracker.app.ui.paiseToInput
+import com.expensetracker.app.ui.parseAmountInput
 import androidx.compose.material3.SwipeToDismissBoxValue
 
 import android.Manifest
@@ -97,7 +103,12 @@ import java.time.ZoneId
 private const val HIGH_CONFIDENCE = 0.7
 
 /** What you'd save for a draft: starts from the prediction, edited inline. */
-private data class DraftEdit(val note: String, val category: Category, val date: LocalDate, val time: LocalTime)
+private data class DraftEdit(
+    val note: String, val category: Category, val date: LocalDate, val time: LocalTime,
+    /** Amount as typed; starts as the parsed amount. */
+    val amountText: String,
+    val isIncome: Boolean,
+)
 
 private fun CapturedPayment.localDateTime(): LocalDateTime =
     LocalDateTime.ofInstant(Instant.ofEpochMilli(atMillis), ZoneId.systemDefault())
@@ -111,7 +122,7 @@ private fun predictionFor(p: CapturedPayment): Predictor.Prediction = try {
 private fun defaultEdit(p: CapturedPayment, pred: Predictor.Prediction): DraftEdit {
     val at = p.localDateTime()
     val note = pred.note.ifBlank { if (p.payee == "Unknown") "" else p.payee }
-    return DraftEdit(note, pred.category, at.toLocalDate(), at.toLocalTime().withSecond(0).withNano(0))
+    return DraftEdit(note, pred.category, at.toLocalDate(), at.toLocalTime().withSecond(0).withNano(0), paiseToInput(p.amountPaise), p.isIncome)
 }
 
 private fun isListenerGranted(ctx: Context): Boolean = CaptureListener.granted(ctx)
@@ -178,32 +189,46 @@ fun CaptureInboxScreen(vm: ExpenseViewModel, onBack: () -> Unit) {
 
     fun confirm(p: CapturedPayment, stamp: Long = System.currentTimeMillis()) {
         val e = editOf(p)
+        val amount = parseAmountInput(e.amountText)?.takeIf { it > 0 }
+        if (amount == null) {
+            scope.launch {
+                snackbar.currentSnackbarData?.dismiss()
+                snackbar.showSnackbar("Enter the amount first")
+            }
+            return
+        }
+        val note = e.note.trim().ifBlank { p.payee }
         vm.add(
             Expense(
-                amountPaise = p.amountPaise,
-                note = e.note.trim().ifBlank { p.payee },
+                amountPaise = amount,
+                note = note,
                 category = e.category,
                 date = e.date,
-                isIncome = p.isIncome,
+                isIncome = e.isIncome,
                 createdAt = stamp,
                 time = e.time,
             ),
             payee = p.payee.takeIf { it != "Unknown" },
         )
-        CaptureStore.confirm(ctx, p, stamp)
+        // What you saved vs what was read: the parser learns from the difference.
+        CaptureStore.confirm(ctx, p, stamp, amountPaise = amount, isIncome = e.isIncome, note = e.note.trim())
         edits.remove(p.id)
     }
 
-    fun dismiss(p: CapturedPayment) {
-        CaptureStore.dismiss(ctx, p)
+    fun dismiss(p: CapturedPayment, notPayment: Boolean) {
+        CaptureStore.dismiss(ctx, p, notPayment)
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
-            val r = snackbar.showSnackbar("Dismissed ${formatRupees(p.amountPaise)} · ${p.payee}", actionLabel = "Undo", withDismissAction = true)
-            if (r == SnackbarResult.ActionPerformed) CaptureStore.undoDismiss(ctx, p)
+            val what = if (notPayment) "Not a payment — will learn from this" else "Dismissed"
+            val r = snackbar.showSnackbar("$what · ${formatRupees(p.amountPaise)} · ${p.payee}", actionLabel = "Undo", withDismissAction = true)
+            if (r == SnackbarResult.ActionPerformed) CaptureStore.undoDismiss(ctx, p, notPayment)
         }
     }
 
-    val highConfidence = pending.filter { (predictions[it.id]?.confidence ?: 0.0) >= HIGH_CONFIDENCE }
+    val hidden by CaptureStore.hidden.collectAsState()
+    var showHidden by remember { mutableStateOf(false) }
+    // "Confirm all" never includes drafts the learning model only guessed at.
+    val highConfidence = pending.filter { it.origin != ParserModel.Origin.UNSURE && (predictions[it.id]?.confidence ?: 0.0) >= HIGH_CONFIDENCE }
 
     Scaffold(
         topBar = {
@@ -257,8 +282,29 @@ fun CaptureInboxScreen(vm: ExpenseViewModel, onBack: () -> Unit) {
                         confidence = predictions[p.id]?.confidence ?: 0.0,
                         onEdit = { edits[p.id] = it },
                         onConfirm = { confirm(p) },
-                        onDismiss = { dismiss(p) },
+                        onDismiss = { notPayment -> dismiss(p, notPayment) },
                     )
+                }
+            }
+            if (hidden.isNotEmpty()) {
+                item("hidden-header") {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { showHidden = !showHidden }.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Hidden as not payments (${hidden.size})", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Messages like ones you marked “Not a payment”. Kept 7 days.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(if (showHidden) "Hide" else "Show", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                if (showHidden) {
+                    items(hidden, key = { "h-${it.id}" }) { p -> HiddenRow(p, onRestore = { CaptureStore.unhide(ctx, p) }) }
                 }
             }
             item("bottom") { Spacer(Modifier.height(24.dp)) }
@@ -379,6 +425,32 @@ private fun CaptureSettingsCard(enabled: Boolean, granted: Boolean, onEnabled: (
                     )
                 }
             }
+            // What the parser has learned from your reviews (see ParserModel).
+            val learning by CaptureStore.learning.collectAsState()
+            var confirmReset by remember { mutableStateOf(false) }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Learning from your reviews", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (learning.examples == 0) "Confirm, correct or mark drafts “Not a payment” and it adapts to your messages"
+                        else "${learning.formats} message format${if (learning.formats == 1) "" else "s"} learned from ${learning.examples} review${if (learning.examples == 1) "" else "s"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (learning.examples > 0) {
+                    if (confirmReset) {
+                        TextButton(onClick = { CaptureStore.resetLearning(ctx); confirmReset = false }) {
+                            Text("Forget all", color = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        TextButton(onClick = { confirmReset = true }) { Text("Reset") }
+                    }
+                }
+            }
         }
     }
 }
@@ -441,13 +513,15 @@ private fun SwipeableDraft(
     confidence: Double,
     onEdit: (DraftEdit) -> Unit,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
+    /** true = "Not a payment" (teaches the parser); false = just dismiss (duplicate / already logged). */
+    onDismiss: (Boolean) -> Unit,
 ) {
     val state = rememberSwipeToDismissBoxState()
     SwipeToDismissBox(
         state = state,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-        onDismiss = { onDismiss() },
+        // A swipe doesn't say why, so it teaches nothing.
+        onDismiss = { onDismiss(false) },
         backgroundContent = {
             if (state.dismissDirection == SwipeToDismissBoxValue.Settled) return@SwipeToDismissBox
             Box(
@@ -472,8 +546,9 @@ private fun DraftCard(
     confidence: Double,
     onEdit: (DraftEdit) -> Unit,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: (Boolean) -> Unit,
 ) {
+    var showDismissMenu by remember { mutableStateOf(false) }
     var showDate by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
     var showRaw by remember { mutableStateOf(false) }
@@ -483,7 +558,7 @@ private fun DraftCard(
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        (if (p.isIncome) "From " else "To ") + p.payee,
+                        (if (edit.isIncome) "From " else "To ") + p.payee,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -499,21 +574,42 @@ private fun DraftCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                val shownAmount = parseAmountInput(edit.amountText)
                 Text(
-                    (if (p.isIncome) "+" else "") + formatRupees(p.amountPaise),
+                    if (shownAmount == null) "₹ ?" else (if (edit.isIncome) "+" else "") + formatRupees(shownAmount),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (p.isIncome) incomeColor() else Color.Unspecified,
+                    color = if (edit.isIncome) incomeColor() else Color.Unspecified,
                 )
             }
+            when (p.origin) {
+                ParserModel.Origin.UNSURE -> OriginNote("Unsure — found by learning from your reviews. Check the amount.", MaterialTheme.colorScheme.error)
+                ParserModel.Origin.LEARNED -> OriginNote("Read the way you corrected this kind of message before.", MaterialTheme.colorScheme.primary)
+                ParserModel.Origin.REGEX -> Unit
+            }
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = edit.note,
-                onValueChange = { onEdit(edit.copy(note = it)) },
-                label = { Text(if (confidence >= HIGH_CONFIDENCE) "Note (suggested)" else "Note") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = edit.amountText,
+                    onValueChange = { onEdit(edit.copy(amountText = it)) },
+                    label = { Text("₹") },
+                    singleLine = true,
+                    isError = parseAmountInput(edit.amountText) == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(0.35f),
+                )
+                OutlinedTextField(
+                    value = edit.note,
+                    onValueChange = { onEdit(edit.copy(note = it)) },
+                    label = { Text(if (confidence >= HIGH_CONFIDENCE) "Note (suggested)" else "Note") },
+                    singleLine = true,
+                    modifier = Modifier.weight(0.65f),
+                )
+            }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = !edit.isIncome, onClick = { onEdit(edit.copy(isIncome = false)) }, label = { Text("Expense") })
+                FilterChip(selected = edit.isIncome, onClick = { onEdit(edit.copy(isIncome = true)) }, label = { Text("Income") })
+            }
             Spacer(Modifier.height(8.dp))
             val cats = remember { Category.entries }
             val ordered = remember(edit.category) { listOf(edit.category) + cats.filter { it != edit.category } }
@@ -551,9 +647,31 @@ private fun DraftCard(
             }
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("Dismiss") }
+                Box {
+                    TextButton(onClick = { showDismissMenu = true }) { Text("Dismiss") }
+                    DropdownMenu(expanded = showDismissMenu, onDismissRequest = { showDismissMenu = false }) {
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text("Not a payment")
+                                    Text("Teaches auto-capture to skip messages like this", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            onClick = { showDismissMenu = false; onDismiss(true) },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text("Already logged / duplicate")
+                                    Text("A real payment, just not needed here", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            onClick = { showDismissMenu = false; onDismiss(false) },
+                        )
+                    }
+                }
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = onConfirm) { Text(if (p.isIncome) "Save income" else "Confirm") }
+                Button(onClick = onConfirm) { Text(if (edit.isIncome) "Save income" else "Confirm") }
             }
         }
     }
@@ -566,5 +684,44 @@ private fun DraftCard(
             onDismiss = { showTime = false },
             title = "Payment time",
         )
+    }
+}
+
+@Composable
+private fun OriginNote(text: String, color: Color) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = color, modifier = Modifier.padding(top = 6.dp))
+}
+
+/** A draft the learning model hid as not a payment, with a way to bring it back. */
+@Composable
+private fun HiddenRow(p: CapturedPayment, onRestore: () -> Unit) {
+    var showRaw by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).clickable { showRaw = !showRaw }) {
+                Text(
+                    (if (p.isIncome) "+" else "") + formatRupees(p.amountPaise) + " · " + p.payee,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    p.sourceApp + " · " + formatTime(p.localDateTime().hour, p.localDateTime().minute),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onRestore) { Text("It's a payment") }
+        }
+        if (showRaw && p.rawText.isNotBlank()) {
+            Text(
+                p.rawText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                    .padding(8.dp),
+            )
+        }
     }
 }
