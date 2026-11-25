@@ -74,6 +74,8 @@ data class AppStyle(
     val income: Color,
     /** Accent colours used for decoration (badges, stat tiles), cycled by index. */
     val accents: List<Color>,
+    /** AMOLED mode is active (dark + pure black): surfaces sit on true black. */
+    val pureBlack: Boolean = false,
 ) {
     val isBrutal get() = theme == AppThemeId.BRUTAL
     fun accent(i: Int) = accents[Math.floorMod(i, accents.size)]
@@ -189,6 +191,18 @@ private val PaperDark = darkColorScheme(
 )
 
 // ---------------------------------------------------------------- building
+
+/**
+ * [buildStyle] for the pure-black (AMOLED) variant. Themes that separate cards from the background
+ * only by a lighter fill (Evergreen, Material You) lose them on true black, so they get a hairline
+ * outline in the theme's own outline colour; themes that already draw borders keep theirs.
+ */
+fun buildStyle(theme: AppThemeId, dark: Boolean, scheme: ColorScheme, pureBlack: Boolean): AppStyle {
+    val s = buildStyle(theme, dark, scheme)
+    if (!(dark && pureBlack)) return s
+    return if (s.borderWidth == 0.dp) s.copy(borderWidth = 1.dp, borderColor = scheme.outlineVariant, pureBlack = true)
+    else s.copy(pureBlack = true)
+}
 
 fun buildStyle(theme: AppThemeId, dark: Boolean, scheme: ColorScheme): AppStyle = when (theme) {
     AppThemeId.BRUTAL -> AppStyle(
@@ -334,8 +348,9 @@ fun ExpenseTheme(themeId: String? = null, darkMode: Int? = null, pureBlack: Bool
     val prefs = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
     val theme = AppThemeId.of(themeId ?: prefs.getString("themeId", null))
     val dark = isDarkFor(theme, darkMode ?: prefs.getInt("darkMode", DarkMode.SYSTEM))
-    val scheme = schemeFor(theme, dark, ctx, pureBlack ?: prefs.getBoolean("pureBlack", false))
-    val style = buildStyle(theme, dark, scheme)
+    val black = pureBlack ?: prefs.getBoolean("pureBlack", false)
+    val scheme = schemeFor(theme, dark, ctx, black)
+    val style = buildStyle(theme, dark, scheme, black)
     CompositionLocalProvider(LocalAppStyle provides style) {
         MaterialTheme(colorScheme = scheme, typography = typographyFor(style), shapes = shapesFor(style), content = content)
     }
@@ -363,6 +378,7 @@ fun notificationAccent(ctx: Context): Int {
 /** Preview colours for the theme picker (no composition needed). */
 fun previewColors(theme: AppThemeId, dark: Boolean, ctx: Context): Pair<ColorScheme, AppStyle> {
     val d = if (theme == AppThemeId.MIDNIGHT) true else dark
-    val scheme = schemeFor(theme, d, ctx)
-    return scheme to buildStyle(theme, d, scheme)
+    val black = isPureBlack(ctx)
+    val scheme = schemeFor(theme, d, ctx, black)
+    return scheme to buildStyle(theme, d, scheme, black)
 }

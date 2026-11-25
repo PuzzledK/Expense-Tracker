@@ -163,7 +163,8 @@ fun ExpenseApp(
         NavigationBar(
             containerColor = if (style.isBrutal) MaterialTheme.colorScheme.surfaceContainerLowest else MaterialTheme.colorScheme.surfaceContainer,
             tonalElevation = 0.dp,
-            modifier = if (style.isBrutal) Modifier.drawBehind {
+            // Top edge: brutal's ink rule, or a hairline so the bar doesn't melt into true black.
+            modifier = if (style.isBrutal || style.pureBlack) Modifier.drawBehind {
                 drawRect(style.borderColor, size = androidx.compose.ui.geometry.Size(size.width, style.borderWidth.toPx()))
             } else Modifier,
         ) {
