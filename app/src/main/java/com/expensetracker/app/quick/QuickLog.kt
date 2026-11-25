@@ -108,6 +108,7 @@ object QuickLog {
         if (isEnabled(ctx)) showNotification(ctx, s, status)
         updateWidgets(ctx, s)
         QuickLogTileService.requestRefresh(ctx)
+        InfoWidgets.update(ctx, all)
         com.expensetracker.app.budget.BudgetAlerts.check(ctx, all)
     }
 
@@ -126,7 +127,7 @@ object QuickLog {
     fun disable(ctx: Context) {
         ctx.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
         // Widgets still want the midnight reset, so keep the alarm if any widget exists.
-        if (widgetIds(ctx).isEmpty()) cancelMidnightRefresh(ctx)
+        if (widgetIds(ctx).isEmpty() && !InfoWidgets.hasAny(ctx)) cancelMidnightRefresh(ctx)
     }
 
     private fun canNotify(ctx: Context) = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -247,7 +248,7 @@ object QuickLog {
 
     /** After boot / app update: re-arm the midnight alarm and redraw. */
     fun restore(ctx: Context) {
-        if (isEnabled(ctx) || widgetIds(ctx).isNotEmpty()) scheduleMidnightRefresh(ctx)
+        if (isEnabled(ctx) || widgetIds(ctx).isNotEmpty() || InfoWidgets.hasAny(ctx)) scheduleMidnightRefresh(ctx)
         refreshAsync(ctx)
     }
 

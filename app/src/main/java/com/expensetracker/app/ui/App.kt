@@ -90,6 +90,9 @@ fun ExpenseApp(
     openAddRequests: Int,
     openBulkRequests: Int = 0,
     openIncomeRequests: Int = 0,
+    /** Budget widget: switch to [openTab] each time this counter goes up. */
+    openTabRequests: Int = 0,
+    openTab: Tab = Tab.STATS,
     /** A notification asked to open this screen; call [onOverlayRequestHandled] once shown. */
     overlayRequest: Overlay? = null,
     onOverlayRequestHandled: () -> Unit = {},
@@ -129,6 +132,16 @@ fun ExpenseApp(
     var handledAdd by rememberSaveable { mutableIntStateOf(0) }
     var handledBulk by rememberSaveable { mutableIntStateOf(0) }
     var handledIncome by rememberSaveable { mutableIntStateOf(0) }
+    var handledTab by rememberSaveable { mutableIntStateOf(0) }
+
+    LaunchedEffect(openTabRequests) {
+        if (openTabRequests > handledTab) {
+            handledTab = openTabRequests
+            showImport = false
+            overlay = null
+            tab = openTab
+        }
+    }
 
     LaunchedEffect(openIncomeRequests) {
         if (openIncomeRequests > handledIncome) {

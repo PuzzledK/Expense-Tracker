@@ -74,6 +74,30 @@
                 android:resource="@xml/expense_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".quick.BudgetWidget"
+            android:exported="false"
+            android:label="Expenses · Budget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/budget_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".quick.BillsWidget"
+            android:exported="false"
+            android:label="Expenses · Upcoming bills">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/bills_widget_info" />
+        </receiver>
+
         <!-- Auto-capture: reads payment notifications once you grant notification access. -->
         <service
             android:name=".capture.PaymentListenerService"
