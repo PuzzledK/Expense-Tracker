@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,24 @@ sealed interface SheetState {
     data object Adding : SheetState
     data class Editing(val expense: Expense) : SheetState
     data class Bulk(val date: java.time.LocalDate) : SheetState
+
+    companion object {
+        /** "add", "bulk:2026-11-25", "edit:42". */
+        fun encode(s: SheetState): String = when (s) {
+            Closed -> ""
+            Adding -> "add"
+            is Bulk -> "bulk:${s.date}"
+            is Editing -> "edit:${s.expense.id}"
+        }
+
+        /** Back from [encode]; an edited entry is looked up by id (gone since → closed). */
+        fun decode(text: String, find: (Long) -> Expense?): SheetState = when {
+            text == "add" -> Adding
+            text.startsWith("bulk:") -> runCatching { Bulk(java.time.LocalDate.parse(text.removePrefix("bulk:"))) }.getOrDefault(Closed)
+            text.startsWith("edit:") -> text.removePrefix("edit:").toLongOrNull()?.let(find)?.let { Editing(it) } ?: Closed
+            else -> Closed
+        }
+    }
 }
 
 @Composable
@@ -76,7 +95,13 @@ fun ExpenseApp(
     // Month shared between Home and Stats so switching tabs keeps context.
     var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthText)
-    var sheet by remember { mutableStateOf<SheetState>(SheetState.Closed) }
+    // Which sheet is open survives the lock screen (and the app being killed in the background);
+    // the sheets keep what you typed in their own saveable fields.
+    var sheetText by rememberSaveable { mutableStateOf("") }
+    var sheet by remember {
+        mutableStateOf(SheetState.decode(sheetText) { id -> vm.expenses.value.firstOrNull { it.id == id } })
+    }
+    SideEffect { sheetText = SheetState.encode(sheet) }
     // Each tab keeps its own scroll position etc. while another tab or a full-screen page is shown.
     val tabStates = rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }

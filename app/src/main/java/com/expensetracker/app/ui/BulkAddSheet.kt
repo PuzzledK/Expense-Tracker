@@ -42,7 +42,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,7 +90,13 @@ fun BulkAddSheet(
     var showTimePicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     // Category overrides keyed by the line's text, so they survive edits to other lines.
-    val overrides = remember { mutableStateMapOf<String, Category>() }
+    // Saved as "line\tcategoryId" strings so picks survive the lock screen too.
+    val overrides = rememberSaveable(
+        saver = listSaver<SnapshotStateMap<String, Category>, String>(
+            save = { m -> m.map { (line, c) -> line + "\t" + c.id } },
+            restore = { l -> mutableStateMapOf<String, Category>().apply { l.forEach { put(it.substringBeforeLast('\t'), Category.fromId(it.substringAfterLast('\t'))) } } },
+        ),
+    ) { mutableStateMapOf() }
     val focus = remember { FocusRequester() }
 
     val preview = remember(text, date, all) { vm.previewBulk(text, date) }
