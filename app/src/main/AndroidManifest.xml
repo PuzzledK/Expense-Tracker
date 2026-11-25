@@ -88,6 +88,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".subscriptions.SubscriptionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
 

@@ -327,6 +327,11 @@ fun SettingsScreen(
                 modifier = Modifier.clickable { onOpen(Overlay.INSIGHTS) },
             )
             ListItem(
+                headlineContent = { Text("Subscriptions & bills") },
+                supportingContent = { Text("Recurring payments, what's due next and price changes") },
+                modifier = Modifier.clickable { onOpen(Overlay.SUBSCRIPTIONS) },
+            )
+            ListItem(
                 headlineContent = { Text("Categories") },
                 supportingContent = { Text("Add your own, rename, recolour or hide") },
                 modifier = Modifier.clickable { onOpen(Overlay.CATEGORIES) },

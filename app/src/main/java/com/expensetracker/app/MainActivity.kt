@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
         // Force-stop clears alarms; re-arm scheduled backups and the weekly summary on every launch.
         com.expensetracker.app.backup.AutoBackup.restore(this)
         com.expensetracker.app.insights.Insights.restore(this)
+        com.expensetracker.app.subscriptions.Subscriptions.restore(this)
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
             val theme = com.expensetracker.app.ui.AppThemeId.of(settings.themeId)
@@ -115,6 +116,10 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(com.expensetracker.app.backup.AutoBackup.EXTRA_OPEN_BACKUP, false)) {
             overlayRequest.value = com.expensetracker.app.ui.Overlay.BACKUP
             intent.removeExtra(com.expensetracker.app.backup.AutoBackup.EXTRA_OPEN_BACKUP)
+        }
+        if (intent.getBooleanExtra(com.expensetracker.app.subscriptions.Subscriptions.EXTRA_OPEN, false)) {
+            overlayRequest.value = com.expensetracker.app.ui.Overlay.SUBSCRIPTIONS
+            intent.removeExtra(com.expensetracker.app.subscriptions.Subscriptions.EXTRA_OPEN)
         }
         if (intent.getBooleanExtra(EXTRA_OPEN_BULK, false)) {
             openBulkRequests.intValue++
