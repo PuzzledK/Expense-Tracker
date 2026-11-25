@@ -18,7 +18,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -282,6 +284,18 @@ private fun isPureBlack(ctx: Context) =
 private fun schemeFor(theme: AppThemeId, dark: Boolean, ctx: Context, pureBlack: Boolean = isPureBlack(ctx)): ColorScheme =
     baseSchemeFor(theme, dark, ctx).let { if (dark && pureBlack) it.pureBlack() else it }
 
+/** The built-in palettes without a Context (Material You falls back to Evergreen), for tests. */
+internal fun staticScheme(theme: AppThemeId, dark: Boolean, pureBlack: Boolean): ColorScheme {
+    val d = dark || theme == AppThemeId.MIDNIGHT
+    val base = when (theme) {
+        AppThemeId.BRUTAL -> if (d) BrutalDark else BrutalLight
+        AppThemeId.MIDNIGHT -> MidnightScheme
+        AppThemeId.PAPER -> if (d) PaperDark else PaperLight
+        AppThemeId.CLASSIC, AppThemeId.DYNAMIC -> if (d) EvergreenDark else EvergreenLight
+    }
+    return if (d && pureBlack) base.pureBlack() else base
+}
+
 private fun baseSchemeFor(theme: AppThemeId, dark: Boolean, ctx: Context): ColorScheme = when (theme) {
     AppThemeId.DYNAMIC -> when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
@@ -333,6 +347,36 @@ fun isDarkFor(theme: AppThemeId, mode: Int): Boolean = when {
     mode == DarkMode.DARK -> true
     else -> isSystemInDarkTheme()
 }
+
+// ---------------------------------------------------------------- readable text
+
+private val InkText = Color(0xFF111111)
+
+/** WCAG contrast ratio between two opaque colours (1..21). */
+fun contrastRatio(a: Color, b: Color): Float {
+    val la = a.luminance(); val lb = b.luminance()
+    return (maxOf(la, lb) + 0.05f) / (minOf(la, lb) + 0.05f)
+}
+
+/**
+ * Text colour for [bg] (see [textOn]): [preferred] if it reads well (WCAG AA, 4.5:1) on the colour
+ * actually shown — [bg] composited over [behind] when it's translucent — else ink or white,
+ * whichever contrasts more.
+ */
+fun readableText(bg: Color, behind: Color, preferred: Color): Color {
+    val solid = if (bg.alpha < 1f) bg.compositeOver(behind) else bg
+    if (contrastRatio(preferred.copy(alpha = 1f).compositeOver(solid), solid) >= 4.5f) return preferred
+    return if (contrastRatio(InkText, solid) >= contrastRatio(Color.White, solid)) InkText else Color.White
+}
+
+/**
+ * Readable text/icon colour on any fill: the theme's text colour when it works, otherwise ink or
+ * white. Use it wherever text sits on an accent, a heat shade or a translucent tint, instead of a
+ * fixed colour that only works in one theme or mode.
+ */
+@Composable
+fun textOn(bg: Color, behind: Color = MaterialTheme.colorScheme.background, preferred: Color = MaterialTheme.colorScheme.onSurface): Color =
+    readableText(bg, behind, preferred)
 
 /** Income green that fits the active theme. */
 @Composable

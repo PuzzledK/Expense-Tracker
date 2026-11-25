@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.ui.AppStyle
 import com.expensetracker.app.ui.LocalAppStyle
+import com.expensetracker.app.ui.textOn
 import androidx.compose.material3.AssistChip as M3AssistChip
 import androidx.compose.material3.Button as M3Button
 import androidx.compose.material3.FilterChip as M3FilterChip
@@ -125,7 +126,8 @@ private fun contentFor(bg: Color): Color {
         c.secondaryContainer -> c.onSecondaryContainer
         c.tertiaryContainer -> c.onTertiaryContainer
         c.errorContainer -> c.onErrorContainer
-        else -> if (LocalAppStyle.current.isBrutal && !LocalAppStyle.current.dark) Color(0xFF111111) else c.onSurface
+        // Custom fills (tinted goal cards, accents…): theme text if it reads, else ink/white.
+        else -> textOn(bg, behind = c.background)
     }
 }
 
@@ -169,7 +171,6 @@ private fun BrutalButton(
     val pressed by source.collectIsPressedAsState()
     val press = if (pressed && enabled) s.hardShadow else 0.dp
     val shape = MaterialTheme.shapes.small
-    val ink = if (s.dark) MaterialTheme.colorScheme.onSurface else Color(0xFF111111)
     Box(modifier.padding(end = s.hardShadow, bottom = s.hardShadow)) {
         Row(
             Modifier
@@ -181,7 +182,8 @@ private fun BrutalButton(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CompositionLocalProvider(LocalContentColor provides if (enabled) contentFor(fill).takeIf { fill != Color.White } ?: ink else ink.copy(alpha = 0.5f)) {
+            val shown = if (enabled) fill else fill.copy(alpha = 0.45f)
+            CompositionLocalProvider(LocalContentColor provides textOn(shown, preferred = contentFor(fill)).let { if (enabled) it else it.copy(alpha = 0.6f) }) {
                 ProvideTextStyle(MaterialTheme.typography.labelLarge) { content() }
             }
         }
@@ -245,7 +247,7 @@ private fun BrutalFab(onClick: () -> Unit, modifier: Modifier, size: Dp?, fill: 
                 .then(if (size != null) Modifier.size(size) else Modifier.defaultMinSize(minWidth = 40.dp, minHeight = 40.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            CompositionLocalProvider(LocalContentColor provides Color(0xFF111111)) { content() }
+            CompositionLocalProvider(LocalContentColor provides textOn(fill, preferred = Color(0xFF111111))) { content() }
         }
     }
 }

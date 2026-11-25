@@ -6,6 +6,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.lazy.rememberLazyListState
 
 import com.expensetracker.app.ui.kit.themedSurface
+import com.expensetracker.app.ui.kit.defaultCardColor
 
 import androidx.compose.ui.unit.sp
 
@@ -451,7 +452,7 @@ private fun SummaryCard(all: List<Expense>, month: YearMonth, settings: Settings
                     .themedSurface(MaterialTheme.shapes.extraSmall, style.accent(1), style, shadow = false)
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
-                Text(formatMonthShort(month).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color(0xFF111111))
+                Text(formatMonthShort(month).uppercase(), style = MaterialTheme.typography.labelMedium, color = textOn(style.accent(1)))
             }
         }
         Column(Modifier.padding(20.dp).animateContentSize()) {
@@ -574,13 +575,14 @@ private fun QuickAddBar(
                     ),
                 )
                 val sendBg = if (style.isBrutal) style.accent(0) else MaterialTheme.colorScheme.primary
-                val sendFg = if (style.isBrutal) Color(0xFF111111) else MaterialTheme.colorScheme.onPrimary
+                val sendFill = if (style.isBrutal || text.isNotBlank()) sendBg else sendBg.copy(alpha = 0.35f)
+                val sendFg = textOn(sendFill, behind = defaultCardColor(), preferred = if (style.isBrutal) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary)
                 Box(
                     Modifier
                         .size(42.dp)
                         .then(
                             if (style.isBrutal) Modifier.themedSurface(MaterialTheme.shapes.small, sendBg, style, shadow = false)
-                            else Modifier.clip(CircleShape).background(if (text.isNotBlank()) sendBg else sendBg.copy(alpha = 0.35f)),
+                            else Modifier.clip(CircleShape).background(sendFill),
                         )
                         .clickable(enabled = text.isNotBlank()) { submit() },
                     contentAlignment = Alignment.Center,

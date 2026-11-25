@@ -169,12 +169,9 @@ private fun DayCell(day: HeatDay, isToday: Boolean, isFuture: Boolean, isSelecte
     val style = LocalAppStyle.current
     val shape = MaterialTheme.shapes.small
     val fill = if (isFuture) Color.Transparent else heatColor(day.level)
-    val ink = when {
-        isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        style.isBrutal -> Color(0xFF111111).takeIf { day.level > 0 || !style.dark } ?: MaterialTheme.colorScheme.onSurface
-        day.level >= 3 -> heatOn()
-        else -> MaterialTheme.colorScheme.onSurface
-    }
+    // Shades run from the card colour to the accent, so the readable text colour depends on the
+    // shade, the theme and light/dark: work it out from the actual fill.
+    val ink = if (isFuture) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f) else textOn(fill)
     val outline = when {
         isSelected -> MaterialTheme.colorScheme.onSurface
         isToday -> MaterialTheme.colorScheme.primary
@@ -206,11 +203,11 @@ private fun DayCell(day: HeatDay, isToday: Boolean, isFuture: Boolean, isSelecte
     }
 }
 
-/** Level 0..4 → colour. Built from each theme's own accent so it looks native everywhere. */
 @Composable
-private fun heatColor(level: Int): Color {
-    val style = LocalAppStyle.current
-    val c = MaterialTheme.colorScheme
+private fun heatColor(level: Int): Color = heatShade(level, LocalAppStyle.current, MaterialTheme.colorScheme)
+
+/** Level 0..4 → colour. Built from each theme's own accent so it looks native everywhere. */
+internal fun heatShade(level: Int, style: AppStyle, c: androidx.compose.material3.ColorScheme): Color {
     val hot = when {
         style.isBrutal -> style.accent(1)       // brutal pink
         style.theme == AppThemeId.MIDNIGHT -> c.primary
@@ -221,10 +218,9 @@ private fun heatColor(level: Int): Color {
         0 -> empty
         1 -> lerp(empty, hot, 0.22f)
         2 -> lerp(empty, hot, 0.45f)
-        3 -> lerp(empty, hot, 0.72f)
+        // Not 0.72: that lands mid-way between dark and light, where no text colour reads well
+        // (ThemeContrastTest checks every theme).
+        3 -> lerp(empty, hot, 0.86f)
         else -> hot
     }
 }
-
-@Composable
-private fun heatOn(): Color = if (LocalAppStyle.current.isBrutal) Color(0xFF111111) else MaterialTheme.colorScheme.onPrimary

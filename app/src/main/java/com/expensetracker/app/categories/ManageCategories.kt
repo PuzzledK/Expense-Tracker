@@ -369,7 +369,7 @@ private fun EditDialog(
                                 )
                                 .clickable { color = col },
                             contentAlignment = Alignment.Center,
-                        ) { if (col == color) Icon(Icons.Filled.Check, "Selected", tint = Color.White, modifier = Modifier.size(18.dp)) }
+                        ) { if (col == color) Icon(Icons.Filled.Check, "Selected", tint = com.expensetracker.app.ui.textOn(Color(col), preferred = Color.White), modifier = Modifier.size(18.dp)) }
                     }
                 }
 
