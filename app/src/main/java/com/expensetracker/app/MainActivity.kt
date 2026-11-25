@@ -54,10 +54,13 @@ class MainActivity : ComponentActivity() {
             ExpenseTheme(themeId = settings.themeId, darkMode = settings.darkMode, pureBlack = settings.pureBlack) {
                 val all by vm.expenses.collectAsStateWithLifecycle()
                 val home = remember(all, settings.homeCity) { Places.homeCity(all, settings) }
+                // The lock screen replaces the app while locked; this holder saves the app's state
+                // (tab, open page, scroll positions) when it's removed and restores it on unlock.
+                val appState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                 CompositionLocalProvider(LocalHomeCity provides home, LocalAppLock provides appLock) {
                     if (appLock.locked) {
                         LockScreen(onUnlock = appLock::unlock)
-                    } else {
+                    } else appState.SaveableStateProvider("app") {
                         ExpenseApp(
                             vm = vm,
                             openAddRequests = openAddRequests.intValue,

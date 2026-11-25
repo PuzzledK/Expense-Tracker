@@ -30,10 +30,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +77,8 @@ fun ExpenseApp(
     var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthText)
     var sheet by remember { mutableStateOf<SheetState>(SheetState.Closed) }
+    // Each tab keeps its own scroll position etc. while another tab or a full-screen page is shown.
+    val tabStates = rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -90,8 +94,14 @@ fun ExpenseApp(
         }
     }
 
+    // Requests are counters from MainActivity; remember which were handled so coming back from
+    // the lock screen (which re-creates this screen) doesn't replay an old one.
+    var handledAdd by rememberSaveable { mutableIntStateOf(0) }
+    var handledBulk by rememberSaveable { mutableIntStateOf(0) }
+
     LaunchedEffect(openAddRequests) {
-        if (openAddRequests > 0) {
+        if (openAddRequests > handledAdd) {
+            handledAdd = openAddRequests
             tab = Tab.HOME
             showImport = false
             sheet = SheetState.Adding
@@ -107,7 +117,8 @@ fun ExpenseApp(
     }
 
     LaunchedEffect(openBulkRequests) {
-        if (openBulkRequests > 0) {
+        if (openBulkRequests > handledBulk) {
+            handledBulk = openBulkRequests
             tab = Tab.HOME
             showImport = false
             sheet = SheetState.Bulk(java.time.LocalDate.now())
@@ -181,7 +192,7 @@ fun ExpenseApp(
                 }
             },
         )
-    } else {
+    } else tabStates.SaveableStateProvider(tab.name) {
         when (tab) {
             Tab.HOME -> HomeScreen(
                 vm = vm,
