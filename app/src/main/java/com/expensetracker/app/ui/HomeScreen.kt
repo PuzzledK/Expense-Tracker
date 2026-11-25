@@ -138,12 +138,15 @@ fun HomeScreen(
 
     val today = LocalDate.now()
     val q = query.trim()
-    val visible = remember(expenses, month, q, searching, filter, spendInfo) {
+    val smart = remember(q, expenses, today) {
+        com.expensetracker.app.data.SmartQuery.parse(
+            q, today, com.expensetracker.app.data.CategoryRegistry.allInfo(),
+            expenses.mapNotNullTo(HashSet()) { it.place?.trim()?.takeIf(String::isNotEmpty) },
+        )
+    }
+    val visible = remember(expenses, month, q, searching, filter, spendInfo, smart) {
         val base = if (searching && q.isNotEmpty()) {
-            expenses.filter {
-                it.note.contains(q, ignoreCase = true) || it.category.label.contains(q, ignoreCase = true) ||
-                    it.place?.contains(q, ignoreCase = true) == true
-            }
+            expenses.filter { smart.matches(it, spendInfo) }
         } else {
             expenses.filter { month.contains(it.date) }
         }
@@ -189,7 +192,7 @@ fun HomeScreen(
                         TextField(
                             value = query,
                             onValueChange = { query = it },
-                            placeholder = { Text("Search all expenses") },
+                            placeholder = { Text("Search: food over 500 last month") },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -244,10 +247,14 @@ fun HomeScreen(
         ) {
             if (searching && q.isNotEmpty()) {
                 item("filters") { ListFilterBar(filter, ::setFilter, expenses) }
+                if (!smart.isEmpty) item("smart-chips") {
+                    com.expensetracker.app.ui.SmartQueryChips(smart) { part ->
+                        query = com.expensetracker.app.data.SmartQuery.without(query, part)
+                    }
+                }
                 item("search-summary") {
-                    val total = visible.filter { !it.isIncome && !it.isTransfer }.sumOf { it.amountPaise }
                     Text(
-                        "${visible.size} matches · ${formatRupees(total)}",
+                        smartSummary(visible, counted),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
