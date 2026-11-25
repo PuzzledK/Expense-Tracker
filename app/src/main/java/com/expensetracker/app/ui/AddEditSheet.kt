@@ -93,6 +93,9 @@ fun AddEditSheet(
     var date by rememberSaveable { mutableStateOf(existing?.date ?: defaultDate ?: LocalDate.now()) }
     var place by rememberSaveable { mutableStateOf(existing?.place) }
     var goalId by rememberSaveable { mutableStateOf(existing?.goalId) }
+    // New spends start on the active trip (trip mode); you can change or clear it here.
+    val tripCtx = androidx.compose.ui.platform.LocalContext.current
+    var trip by rememberSaveable { mutableStateOf(existing?.trip ?: com.expensetracker.app.trips.TripStore.current(tripCtx)?.name) }
     // Own-account transfer: neither spend nor income. Refund: income that pays back an expense.
     var isTransfer by rememberSaveable { mutableStateOf(existing?.isTransfer ?: false) }
     var refundOf by rememberSaveable { mutableStateOf(existing?.refundOf) }
@@ -163,9 +166,9 @@ fun AddEditSheet(
         if (existing != null) {
             vm.update(existing.copy(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride,
                 time = time, place = place, lat = if (place == existing.place) existing.lat else null, lon = if (place == existing.place) existing.lon else null,
-                goalId = goalId, isTransfer = isTransfer, refundOf = refund))
+                goalId = goalId, isTransfer = isTransfer, refundOf = refund, trip = trip.takeIf { !isIncome && !isTransfer }))
         } else {
-            vm.add(Expense(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride, place = place, time = time, goalId = goalId, isTransfer = isTransfer, refundOf = refund))
+            vm.add(Expense(amountPaise = amt, note = cleanNote, category = category, date = date, isIncome = isIncome, spendOverride = if (isIncome) null else spendOverride, place = place, time = time, goalId = goalId, isTransfer = isTransfer, refundOf = refund, trip = trip.takeIf { !isIncome && !isTransfer }), autoTrip = false)
         }
         close()
     }
@@ -317,6 +320,9 @@ fun AddEditSheet(
 
             if (category == Category.SAVINGS || goalId != null) {
                 com.expensetracker.app.goals.GoalPickerRow(vm, goalId, onChange = { goalId = it })
+            }
+            if (!isIncome && !isTransfer) {
+                com.expensetracker.app.trips.TripPickerRow(vm, trip, onChange = { trip = it })
             }
             Text("Category", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

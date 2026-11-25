@@ -108,9 +108,11 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** [payee]: for confirmed auto-captured payments, so the model learns payee → your note. */
-    fun add(e: Expense, payee: String? = null) {
+    /** [autoTrip]: false when the add sheet already showed (and let you change) the trip. */
+    fun add(e: Expense, payee: String? = null, autoTrip: Boolean = true) {
         var id = 0L
-        write({ id = db.insert(e.copy(id = 0)) }) {
+        val tagged = if (autoTrip) com.expensetracker.app.trips.TripStore.tag(getApplication(), e) else e
+        write({ id = db.insert(tagged.copy(id = 0)) }) {
             Predictor.learn(e.copy(id = id), payee)
             autoTag(listOf(e), listOf(id))
         }
@@ -125,6 +127,11 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Unlinks entries from a deleted savings goal. */
     fun clearGoal(goalId: String) = write({ db.clearGoal(goalId) })
+
+    /** Renames (or merges into) a trip; null removes the tag but keeps the entries. */
+    fun setTrip(from: String, to: String?) = write({ db.setTrip(from, to) }) {
+        com.expensetracker.app.trips.TripStore.renamed(getApplication(), from, to)
+    }
     fun delete(e: Expense) = write({ db.delete(e.id) })
     fun restore(e: Expense) = write({ db.insert(e) })
 
@@ -134,7 +141,8 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         val now = System.currentTimeMillis()
         var ids: List<Long> = emptyList()
         // createdAt offsets keep the typed order within the day.
-        write({ ids = db.insertAll(list.mapIndexed { i, e -> e.copy(id = 0, createdAt = now + i) }) }) {
+        val app = getApplication<Application>()
+        write({ ids = db.insertAll(list.mapIndexed { i, e -> com.expensetracker.app.trips.TripStore.tag(app, e).copy(id = 0, createdAt = now + i) }) }) {
             onDone(ids)
             autoTag(list, ids)
         }

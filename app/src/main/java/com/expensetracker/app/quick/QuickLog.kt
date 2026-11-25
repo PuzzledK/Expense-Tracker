@@ -81,7 +81,7 @@ object QuickLog {
                     isIncome = q.isIncome,
                     createdAt = now + i,
                     time = time,
-                )
+                ).let { com.expensetracker.app.trips.TripStore.tag(ctx, it) }
             }
         if (entries.isNotEmpty() && date == LocalDate.now()) {
             val ids = db.insertAll(entries)
