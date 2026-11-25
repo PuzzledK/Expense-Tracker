@@ -44,9 +44,8 @@ data class SmartQuery(
         if (from != null && e.date < from) return false
         if (to != null && e.date > to) return false
         if (place != null && !e.place.orEmpty().equals(place, ignoreCase = true)) return false
-        // TODO(trips): once Expense has `trip`, match `e.trip.equals(trip, ignoreCase = true)` here.
-        //  Until then a trip filter falls back to matching the name in the note/place text.
-        if (trip != null && !textHas(e, trip)) return false
+        // trip:<name> matches the entry's trip (prefix, any case).
+        if (trip != null && e.trip?.startsWith(trip, ignoreCase = true) != true) return false
         when (kind) {
             null -> {}
             Kind.SPEND -> if (e.isIncome || e.isTransfer) return false

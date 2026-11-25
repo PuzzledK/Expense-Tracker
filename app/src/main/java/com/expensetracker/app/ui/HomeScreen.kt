@@ -261,6 +261,7 @@ fun HomeScreen(
                     )
                 }
             } else if (!searching) {
+                item("trip") { com.expensetracker.app.trips.TripBanner(vm) }
                 item("month") {
                     MonthSelector(month, onMonthChange, Modifier.padding(horizontal = 4.dp))
                 }
@@ -762,7 +763,8 @@ fun ExpenseRow(
                     val t = spend?.type
                     if (!expense.isIncome && !expense.isTransfer && (t == SpendType.ONE_OFF || t == SpendType.FIXED)) {
                         Text(
-                            "  ${t.emoji} ${if (t == SpendType.ONE_OFF) "One-off" else "Fixed"}",
+                            if (t == SpendType.ONE_OFF && expense.trip != null && spend.auto) "  ✈️ ${expense.trip}"
+                            else "  ${t.emoji} ${if (t == SpendType.ONE_OFF) "One-off" else "Fixed"}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                             maxLines = 1,

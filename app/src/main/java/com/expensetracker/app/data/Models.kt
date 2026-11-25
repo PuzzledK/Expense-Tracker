@@ -29,6 +29,8 @@ data class Expense(
     val refundOf: Long? = null,
     /** Money moved between your own accounts: neither spend nor income. */
     val isTransfer: Boolean = false,
+    /** Trip / event this entry belongs to ("Goa 2026"); null = none. Trip spends stay out of everyday averages. */
+    val trip: String? = null,
 )
 
 /** How an expense should count towards averages. */

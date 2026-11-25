@@ -132,4 +132,10 @@ class SmartQueryTest {
         assertEquals((2000 - 500 + 650 + 120) * 100L to 40000 * 100L, smartTotals(oct, counted))
         assertTrue(smartSummary(listOf(list[4]), counted).startsWith("1 entry · ₹500"))
     }
+
+    @Test fun tripFilterUsesTheTripField() {
+        val goa = e(10, 800, Category.FOOD, LocalDate.of(2026, 11, 20), "Beach shack").copy(trip = "Goa 2026")
+        val home = e(11, 300, Category.FOOD, LocalDate.of(2026, 11, 21), "Goa sausages") // no trip
+        assertEquals(listOf(10L), listOf(goa, home).filter { p("trip:goa").matches(it) }.map { it.id })
+    }
 }

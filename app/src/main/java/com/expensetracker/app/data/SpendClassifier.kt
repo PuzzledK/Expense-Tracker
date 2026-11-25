@@ -51,6 +51,7 @@ object SpendClassifier {
             e.amountPaise > 0 &&
                 e.category != Category.SAVINGS && e.category != Category.RENT && e.category != Category.BILLS &&
                 noteKey(e.note) !in recurring &&
+                (e.trip == null || e.spendOverride == SpendType.EVERYDAY) &&
                 (e.spendOverride == null || e.spendOverride == SpendType.EVERYDAY)
         }
         val global = baseline(pool.map { it.amountPaise })
@@ -67,6 +68,7 @@ object SpendClassifier {
 
     private fun classifyOne(e: Expense, recurring: Map<String, Long>, base: Baseline?, ownCategory: Boolean): SpendInfo {
         e.spendOverride?.let { return SpendInfo(it, "Set by you", auto = false) }
+        e.trip?.let { return SpendInfo(SpendType.ONE_OFF, "Trip: $it") }
         if (e.category == Category.SAVINGS) return SpendInfo(SpendType.SAVINGS, "Savings category")
         if (e.category == Category.RENT) return SpendInfo(SpendType.FIXED, "Rent & bills")
         if (e.category == Category.BILLS) return SpendInfo(SpendType.FIXED, "Recharge / subscription")

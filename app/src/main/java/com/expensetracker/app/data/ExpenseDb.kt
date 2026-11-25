@@ -9,7 +9,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 /** Plain SQLite storage; no annotation processing needed. */
-class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", null, 6) {
+class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", null, 7) {
 
     init {
         CategoryRegistry.ensureLoaded(context)
@@ -33,7 +33,8 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
                 time_min INTEGER,
                 goal_id TEXT,
                 refund_of INTEGER,
-                is_transfer INTEGER NOT NULL DEFAULT 0
+                is_transfer INTEGER NOT NULL DEFAULT 0,
+                trip TEXT
             )
             """.trimIndent()
         )
@@ -58,10 +59,12 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
             db.execSQL("ALTER TABLE expenses ADD COLUMN refund_of INTEGER")
             db.execSQL("ALTER TABLE expenses ADD COLUMN is_transfer INTEGER NOT NULL DEFAULT 0")
         }
+        // v7: trip / event tag (kept out of everyday averages).
+        if (oldVersion < 7) db.execSQL("ALTER TABLE expenses ADD COLUMN trip TEXT")
     }
 
     fun all(): List<Expense> = readableDatabase.rawQuery(
-        "SELECT id, amount_paise, note, category, epoch_day, is_income, created_at, spend_override, place, lat, lon, time_min, goal_id, refund_of, is_transfer FROM expenses " +
+        "SELECT id, amount_paise, note, category, epoch_day, is_income, created_at, spend_override, place, lat, lon, time_min, goal_id, refund_of, is_transfer, trip FROM expenses " +
             "ORDER BY epoch_day DESC, created_at DESC, id DESC",
         null,
     ).use { c -> buildList { while (c.moveToNext()) add(c.toExpense()) } }
@@ -144,6 +147,12 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
     }
 
     /** Detaches entries from a deleted goal. */
+    /** Renames trip [from] to [to] on every entry (null clears the tag). Returns rows changed. */
+    fun setTrip(from: String, to: String?): Int {
+        val v = ContentValues().apply { if (to == null) putNull("trip") else put("trip", to) }
+        return writableDatabase.update("expenses", v, "trip = ?", arrayOf(from))
+    }
+
     fun clearGoal(goalId: String): Int {
         val v = ContentValues().apply { putNull("goal_id") }
         return writableDatabase.update("expenses", v, "goal_id = ?", arrayOf(goalId))
@@ -177,6 +186,7 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         put("goal_id", goalId)
         put("refund_of", refundOf)
         put("is_transfer", if (isTransfer) 1 else 0)
+        put("trip", trip)
     }
 
     private fun Cursor.toExpense() = Expense(
@@ -195,5 +205,6 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         goalId = if (isNull(12)) null else getString(12),
         refundOf = if (isNull(13)) null else getLong(13),
         isTransfer = getInt(14) == 1,
+        trip = if (isNull(15)) null else getString(15),
     )
 }

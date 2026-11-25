@@ -346,6 +346,11 @@ fun SettingsScreen(
                 modifier = Modifier.clickable { onOpen(Overlay.RULES) },
             )
             ListItem(
+                headlineContent = { Text("Trips & events") },
+                supportingContent = { Text("Trip mode, and what each trip cost — kept out of everyday averages") },
+                modifier = Modifier.clickable { onOpen(Overlay.TRIPS) },
+            )
+            ListItem(
                 headlineContent = { Text("Categories") },
                 supportingContent = { Text("Add your own, rename, recolour or hide") },
                 modifier = Modifier.clickable { onOpen(Overlay.CATEGORIES) },

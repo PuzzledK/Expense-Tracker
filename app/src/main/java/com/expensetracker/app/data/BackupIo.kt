@@ -61,6 +61,7 @@ object BackupIo {
             // Ids don't survive a restore, so a refund points at its expense's createdAt.
             e.refundOf?.let { r -> byId[r]?.let { append(", \"refundOfCreatedAt\": ").append(it.createdAt) } }
             if (e.isTransfer) append(", \"isTransfer\": true")
+            e.trip?.let { append(", \"trip\": ").append(quote(it)) }
             e.time?.let { append(", \"time\": ").append(quote(String.format(java.util.Locale.ROOT, "%02d:%02d", it.hour, it.minute))) }
             if (e.lat != null && e.lon != null) append(", \"lat\": ").append(e.lat).append(", \"lon\": ").append(e.lon)
             append("}")
@@ -125,6 +126,7 @@ object BackupIo {
                 // Holds the target's createdAt until [refundLinks] maps it to a real id after insert.
                 refundOf = (o["refundOfCreatedAt"] as? Number)?.toLong(),
                 isTransfer = o["isTransfer"] as? Boolean ?: false,
+                trip = (o["trip"] as? String)?.trim()?.takeIf { it.isNotEmpty() },
             )
         }
         val settingsPatch: ((Settings) -> Settings)? = (root["settings"] as? Map<*, *>)?.let { s ->
