@@ -114,8 +114,7 @@ private fun defaultEdit(p: CapturedPayment, pred: Predictor.Prediction): DraftEd
     return DraftEdit(note, pred.category, at.toLocalDate(), at.toLocalTime().withSecond(0).withNano(0))
 }
 
-private fun isListenerGranted(ctx: Context): Boolean =
-    NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+private fun isListenerGranted(ctx: Context): Boolean = CaptureListener.granted(ctx)
 
 /** Banner on Home: "3 payments to review". Renders nothing when there are none. */
 @Composable
@@ -298,15 +297,24 @@ private fun CaptureSettingsCard(enabled: Boolean, granted: Boolean, onEnabled: (
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val connected by CaptureListener.connected.collectAsState()
+                // "Allowed" isn't enough: after an update some phones never reconnect the listener.
+                val stalled = enabled && granted && !connected
                 Column(Modifier.weight(1f)) {
                     Text("Notification access", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (granted) "Allowed" else "Not allowed — needed to see payments",
+                        when {
+                            !granted -> "Not allowed — needed to see payments"
+                            stalled -> "Allowed, but not running — tap Restart"
+                            enabled -> "Allowed · running"
+                            else -> "Allowed"
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (granted) incomeColor() else if (enabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (granted && !stalled) incomeColor() else if (enabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                OutlinedButton(onClick = onOpenAccess) { Text(if (granted) "Manage" else "Allow") }
+                if (stalled) OutlinedButton(onClick = { CaptureListener.ensureRunning(ctx, force = true) }) { Text("Restart") }
+                else OutlinedButton(onClick = onOpenAccess) { Text(if (granted) "Manage" else "Allow") }
             }
             // Bank SMS: Android 15+ hides their notification text from other apps, so read SMS directly.
             var smsGranted by remember { mutableStateOf(SmsAccess.granted(ctx)) }

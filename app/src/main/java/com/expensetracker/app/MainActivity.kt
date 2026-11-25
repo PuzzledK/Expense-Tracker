@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         vm.reload()
         com.expensetracker.app.capture.CaptureStore.refresh(this)
+        com.expensetracker.app.capture.CaptureListener.ensureRunning(this)
     }
 
     override fun onNewIntent(intent: Intent) {

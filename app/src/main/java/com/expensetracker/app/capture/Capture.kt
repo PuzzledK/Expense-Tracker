@@ -1,11 +1,16 @@
 package com.expensetracker.app.capture
 
 import android.app.Notification
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.provider.Telephony
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
 import com.expensetracker.app.data.ExpenseDb
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -153,6 +158,42 @@ internal object CapturePrefs {
     fun setNotifyOnCapture(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("notify", on).apply()
 }
 
+/**
+ * Keeps the notification listener bound. Android kills the app's process on every update, and
+ * many phones (ColorOS, OxygenOS, MIUI…) then never rebind the listener: Settings still says
+ * "allowed" but nothing arrives. We ask for a rebind whenever the app starts or is updated, and
+ * if that doesn't connect within a few seconds, flip the service component off and on, which
+ * makes the system bind it afresh.
+ */
+object CaptureListener {
+    private val _connected = MutableStateFlow(false)
+    /** True while Android has the listener bound and delivering notifications. */
+    val connected: StateFlow<Boolean> = _connected
+
+    internal fun setConnected(on: Boolean) { _connected.value = on }
+
+    fun granted(ctx: Context): Boolean =
+        NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+
+    /** Call on app start/resume, boot and after an update. No-op when capture is off or access isn't granted. */
+    fun ensureRunning(ctx: Context, force: Boolean = false) {
+        val app = ctx.applicationContext
+        if (!CapturePrefs.captureEnabled(app) || !granted(app)) return
+        if (_connected.value && !force) return
+        val cn = ComponentName(app, PaymentListenerService::class.java)
+        try { NotificationListenerService.requestRebind(cn) } catch (e: Exception) { Log.w(TAG, "rebind failed", e) }
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (_connected.value) return@postDelayed
+            try {
+                val pm = app.packageManager
+                pm.setComponentEnabledSetting(cn, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+                pm.setComponentEnabledSetting(cn, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+                NotificationListenerService.requestRebind(cn)
+            } catch (e: Exception) { Log.w(TAG, "component toggle failed", e) }
+        }, 4_000)
+    }
+}
+
 /** Declared in the manifest; needs the user to grant notification access. */
 /** Debug-build logging switch for the listener (release builds stay quiet). */
 internal object BuildConfigDebug { @JvmField var on = false }
@@ -163,7 +204,15 @@ class PaymentListenerService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         BuildConfigDebug.on = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        CaptureListener.setConnected(true)
         if (BuildConfigDebug.on) Log.d(TAG, "listener connected")
+    }
+
+    override fun onListenerDisconnected() {
+        CaptureListener.setConnected(false)
+        if (BuildConfigDebug.on) Log.d(TAG, "listener disconnected")
+        // Ask to be bound again (e.g. after the system dropped us under memory pressure).
+        try { requestRebind(ComponentName(this, PaymentListenerService::class.java)) } catch (_: Exception) { }
     }
 
 
