@@ -341,6 +341,11 @@ fun SettingsScreen(
                 modifier = Modifier.clickable { onOpen(Overlay.SUBSCRIPTIONS) },
             )
             ListItem(
+                headlineContent = { Text("Auto-tagging rules") },
+                supportingContent = { Text("“If the note has swiggy → Food, rename to Swiggy”") },
+                modifier = Modifier.clickable { onOpen(Overlay.RULES) },
+            )
+            ListItem(
                 headlineContent = { Text("Categories") },
                 supportingContent = { Text("Add your own, rename, recolour or hide") },
                 modifier = Modifier.clickable { onOpen(Overlay.CATEGORIES) },

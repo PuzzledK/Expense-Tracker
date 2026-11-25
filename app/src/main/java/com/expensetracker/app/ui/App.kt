@@ -52,7 +52,7 @@ import java.time.YearMonth
 enum class Tab { HOME, STATS, SETTINGS }
 
 /** Full-screen feature pages opened over the tabs. */
-enum class Overlay { CATEGORIES, GOALS, INSIGHTS, CAPTURE, BACKUP, SUBSCRIPTIONS }
+enum class Overlay { CATEGORIES, GOALS, INSIGHTS, CAPTURE, BACKUP, SUBSCRIPTIONS, RULES }
 
 /** State of the add/edit sheet: closed, adding a new entry, or editing an existing one. */
 sealed interface SheetState {
@@ -218,6 +218,7 @@ fun ExpenseApp(
             Overlay.CAPTURE -> com.expensetracker.app.capture.CaptureInboxScreen(vm, close)
             Overlay.BACKUP -> com.expensetracker.app.backup.BackupSettingsScreen(vm, close)
             Overlay.SUBSCRIPTIONS -> com.expensetracker.app.subscriptions.SubscriptionsScreen(vm, close)
+            Overlay.RULES -> com.expensetracker.app.rules.AutoRulesScreen(vm, close)
             null -> Unit
         }
     } else if (showImport) {

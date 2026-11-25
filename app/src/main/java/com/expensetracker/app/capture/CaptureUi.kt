@@ -83,6 +83,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.expensetracker.app.ExpenseViewModel
+import com.expensetracker.app.data.AutoRule
+import com.expensetracker.app.data.AutoRules
 import com.expensetracker.app.data.Category
 import com.expensetracker.app.data.Expense
 import com.expensetracker.app.ml.Predictor
@@ -126,12 +128,15 @@ private fun predictionFor(p: CapturedPayment): Predictor.Prediction = try {
     Predictor.Prediction(p.payee, Category.OTHER, 0.0)
 }
 
-private fun defaultEdit(p: CapturedPayment, pred: Predictor.Prediction, all: List<Expense>): DraftEdit {
+private fun defaultEdit(p: CapturedPayment, pred: Predictor.Prediction, all: List<Expense>, rules: List<AutoRule> = emptyList()): DraftEdit {
     val at = p.localDateTime()
     val note = pred.note.ifBlank { if (p.payee == "Unknown") "" else p.payee }
     val g = MoneyMoves.guess(p.rawText, p.payee, p.amountPaise, p.isIncome, at.toLocalDate(), all)
+    // Your auto-tagging rules beat the learned guess; they see the payee and the guessed note.
+    val rule = AutoRules.firstMatch(rules, "$note ${p.payee}", p.amountPaise, p.isIncome)
     return DraftEdit(
-        note, pred.category, at.toLocalDate(), at.toLocalTime().withSecond(0).withNano(0), paiseToInput(p.amountPaise), p.isIncome,
+        rule?.rename?.takeIf { it.isNotBlank() } ?: note,
+        rule?.categoryId?.let { Category.fromId(it) } ?: pred.category, at.toLocalDate(), at.toLocalTime().withSecond(0).withNano(0), paiseToInput(p.amountPaise), p.isIncome,
         transfer = g.transfer, refundOf = g.refundOf?.id, refundLabel = g.refundOf?.let { refundLabel(it) }, suggestedRefund = g.refundOf?.id,
     )
 }
@@ -199,7 +204,7 @@ fun CaptureInboxScreen(vm: ExpenseViewModel, onBack: () -> Unit) {
     val predictions = remember(pending) { pending.associate { it.id to predictionFor(it) } }
     val edits = remember { mutableStateMapOf<Long, DraftEdit>() }
     val allExpenses by vm.expenses.collectAsState()
-    fun editOf(p: CapturedPayment) = edits[p.id] ?: defaultEdit(p, predictions[p.id] ?: predictionFor(p), allExpenses)
+    fun editOf(p: CapturedPayment) = edits[p.id] ?: defaultEdit(p, predictions[p.id] ?: predictionFor(p), allExpenses, settings.autoRules)
 
     fun confirm(p: CapturedPayment, stamp: Long = System.currentTimeMillis()) {
         val e = editOf(p)

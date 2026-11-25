@@ -3,6 +3,8 @@ package com.expensetracker.app
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.expensetracker.app.data.AutoRule
+import com.expensetracker.app.data.AutoRules
 import com.expensetracker.app.data.BackupIo
 import com.expensetracker.app.data.Categorizer
 import com.expensetracker.app.data.Category
@@ -108,7 +110,9 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** [payee]: for confirmed auto-captured payments, so the model learns payee → your note. */
-    fun add(e: Expense, payee: String? = null) {
+    fun add(e0: Expense, payee: String? = null) {
+        // Your rules fill in "counts as" when it wasn't picked; category/note stay as you typed them.
+        val e = AutoRules.apply(settings.value.autoRules, e0, setCategory = false, renameNote = false)
         var id = 0L
         write({ id = db.insert(e.copy(id = 0)) }) {
             Predictor.learn(e.copy(id = id), payee)
@@ -129,8 +133,10 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
     fun restore(e: Expense) = write({ db.insert(e) })
 
     /** Adds several entries at once; [onDone] gets the new ids (for Undo). */
-    fun addAll(list: List<Expense>, onDone: (List<Long>) -> Unit = {}) {
-        if (list.isEmpty()) return
+    fun addAll(list0: List<Expense>, onDone: (List<Long>) -> Unit = {}) {
+        if (list0.isEmpty()) return
+        val rules = settings.value.autoRules
+        val list = list0.map { AutoRules.apply(rules, it, setCategory = false, renameNote = false) }
         val now = System.currentTimeMillis()
         var ids: List<Long> = emptyList()
         // createdAt offsets keep the typed order within the day.
@@ -150,7 +156,8 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         text.lines().map { it.trim() }.filter { it.isNotEmpty() }.map { line ->
             val q = NotesParser.parseLine(line)
             line to q?.let {
-                Expense(amountPaise = it.amountPaise, note = it.note, category = suggestCategory(it.note), date = date, isIncome = it.isIncome)
+                AutoRules.apply(settings.value.autoRules,
+                    Expense(amountPaise = it.amountPaise, note = it.note, category = suggestCategory(it.note), date = date, isIncome = it.isIncome))
             }
         }
 
@@ -163,14 +170,37 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
             date = date,
             isIncome = q.isIncome,
             time = if (date == LocalDate.now()) java.time.LocalTime.now().withSecond(0).withNano(0) else null,
-        )
+        ).let { AutoRules.apply(settings.value.autoRules, it) }
         add(e)
         return e
     }
 
+    /** Saves your auto-tagging rules. */
+    fun setAutoRules(rules: List<AutoRule>) = updateSettings { it.copy(autoRules = rules) }
+
+    /** Past entries [rules] would change: (before, after) pairs. */
+    fun ruleChangesForPast(rules: List<AutoRule>): List<Pair<Expense, Expense>> = AutoRules.changesForPast(rules, _expenses.value)
+
+    /** Rewrites past entries per [rules]; [onDone] gets how many changed. */
+    fun applyRulesToPast(rules: List<AutoRule>, onDone: (Int) -> Unit = {}) {
+        val changed = ruleChangesForPast(rules).map { it.second }
+        if (changed.isEmpty()) { onDone(0); return }
+        write({ changed.forEach { db.update(it) } }) { onDone(changed.size) }
+    }
+
     /** Category guess for a typed note, from the self-improving predictor (ml/). */
-    fun suggestCategory(note: String, amountPaise: Long? = null, place: String? = null): Category =
-        Predictor.predictCategory(note, amountPaise, java.time.LocalDateTime.now(), place)
+    fun suggestCategory(note: String, amountPaise: Long? = null, place: String? = null, isIncome: Boolean = false): Category =
+        ruleCategory(note, amountPaise, isIncome)
+            ?: Predictor.predictCategory(note, amountPaise, java.time.LocalDateTime.now(), place)
+
+    /** Category from your own auto-tagging rules, if one matches (beats the learned guess). */
+    fun ruleCategory(note: String, amountPaise: Long? = null, isIncome: Boolean = false): Category? {
+        val rules = settings.value.autoRules
+        if (rules.isEmpty()) return null
+        val r = if (amountPaise == null) rules.firstOrNull { it.hasAction && it.categoryId != null && it.copy(minPaise = null, maxPaise = null).matches(note, 0, isIncome) }
+        else AutoRules.firstMatch(rules, note, amountPaise, isIncome)
+        return r?.categoryId?.let { Category.fromId(it) }
+    }
 
     fun previewImport(text: String, firstYear: Int, undatedMonth: java.time.YearMonth? = null): ParseResult =
         NotesParser.parse(text, firstYear, undatedMonth)

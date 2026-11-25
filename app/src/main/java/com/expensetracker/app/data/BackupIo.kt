@@ -41,6 +41,7 @@ object BackupIo {
         append(", \"reminderMinute\": ").append(settings.reminderMinute)
         append(", \"homeCity\": ").append(quote(settings.homeCity))
         append(", \"categoryBudgets\": ").append(quote(CategoryBudgets.encode(settings.categoryBudgets)))
+        append(", \"autoRules\": ").append(quote(AutoRules.encode(settings.autoRules)))
         append("},\n")
         if (categories != null) append("  \"categories\": ").append(quote(CategoryRegistry.encode(categories))).append(",\n")
         if (goalsText != null) append("  \"goals\": ").append(quote(goalsText)).append(",\n")
@@ -136,6 +137,7 @@ object BackupIo {
                     reminderMinute = (s["reminderMinute"] as? Number)?.toInt() ?: cur.reminderMinute,
                     homeCity = s["homeCity"] as? String ?: cur.homeCity,
                     categoryBudgets = (s["categoryBudgets"] as? String)?.let { CategoryBudgets.decode(it) } ?: cur.categoryBudgets,
+                    autoRules = (s["autoRules"] as? String)?.let { AutoRules.decode(it) } ?: cur.autoRules,
                 )
             }
         }

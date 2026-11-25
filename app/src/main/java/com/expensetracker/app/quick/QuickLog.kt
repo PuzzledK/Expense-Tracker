@@ -71,9 +71,10 @@ object QuickLog {
         val all = db.all()
         val now = System.currentTimeMillis()
         val time = if (date == LocalDate.now()) LocalTime.now().withSecond(0).withNano(0) else null
+        val rules = com.expensetracker.app.data.AutoRules.saved(ctx)
         val entries = text.lines().map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { NotesParser.parseLine(it) }
             .mapIndexed { i, q ->
-                Expense(
+                com.expensetracker.app.data.AutoRules.apply(rules, Expense(
                     amountPaise = q.amountPaise,
                     note = q.note,
                     category = Predictor.also { it.train(all) }.predictCategory(q.note, q.amountPaise, java.time.LocalDateTime.now()),
@@ -81,7 +82,7 @@ object QuickLog {
                     isIncome = q.isIncome,
                     createdAt = now + i,
                     time = time,
-                )
+                ))
             }
         if (entries.isNotEmpty() && date == LocalDate.now()) {
             val ids = db.insertAll(entries)
