@@ -9,7 +9,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 /** Plain SQLite storage; no annotation processing needed. */
-class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", null, 5) {
+class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", null, 6) {
 
     init {
         CategoryRegistry.ensureLoaded(context)
@@ -31,7 +31,9 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
                 lat REAL,
                 lon REAL,
                 time_min INTEGER,
-                goal_id TEXT
+                goal_id TEXT,
+                refund_of INTEGER,
+                is_transfer INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )
@@ -51,10 +53,15 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         if (oldVersion < 4) db.execSQL("ALTER TABLE expenses ADD COLUMN time_min INTEGER")
         // v5: savings goal link.
         if (oldVersion < 5) db.execSQL("ALTER TABLE expenses ADD COLUMN goal_id TEXT")
+        // v6: refund link and own-account transfers.
+        if (oldVersion < 6) {
+            db.execSQL("ALTER TABLE expenses ADD COLUMN refund_of INTEGER")
+            db.execSQL("ALTER TABLE expenses ADD COLUMN is_transfer INTEGER NOT NULL DEFAULT 0")
+        }
     }
 
     fun all(): List<Expense> = readableDatabase.rawQuery(
-        "SELECT id, amount_paise, note, category, epoch_day, is_income, created_at, spend_override, place, lat, lon, time_min, goal_id FROM expenses " +
+        "SELECT id, amount_paise, note, category, epoch_day, is_income, created_at, spend_override, place, lat, lon, time_min, goal_id, refund_of, is_transfer FROM expenses " +
             "ORDER BY epoch_day DESC, created_at DESC, id DESC",
         null,
     ).use { c -> buildList { while (c.moveToNext()) add(c.toExpense()) } }
@@ -72,6 +79,21 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
             val ids = list.map { db.insertOrThrow("expenses", null, it.toValues(keepId = false)) }
             db.setTransactionSuccessful()
             return ids
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Points refunds at their expense after an import gave everything new ids. */
+    fun setRefundLinks(links: Map<Long, Long>) {
+        if (links.isEmpty()) return
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            links.forEach { (refund, target) ->
+                db.update("expenses", ContentValues().apply { put("refund_of", target) }, "id = ?", arrayOf(refund.toString()))
+            }
+            db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
         }
@@ -153,6 +175,8 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         put("lon", lon)
         put("time_min", time?.let { it.hour * 60 + it.minute })
         put("goal_id", goalId)
+        put("refund_of", refundOf)
+        put("is_transfer", if (isTransfer) 1 else 0)
     }
 
     private fun Cursor.toExpense() = Expense(
@@ -169,5 +193,7 @@ class ExpenseDb(context: Context) : SQLiteOpenHelper(context, "expenses.db", nul
         lon = if (isNull(10)) null else getDouble(10),
         time = if (isNull(11)) null else getInt(11).let { LocalTime.of(it / 60, it % 60) },
         goalId = if (isNull(12)) null else getString(12),
+        refundOf = if (isNull(13)) null else getLong(13),
+        isTransfer = getInt(14) == 1,
     )
 }

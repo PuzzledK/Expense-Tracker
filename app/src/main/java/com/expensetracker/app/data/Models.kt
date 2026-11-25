@@ -25,6 +25,10 @@ data class Expense(
     val time: LocalTime? = null,
     /** Savings goal this entry counts towards (see goals/); null = none. */
     val goalId: String? = null,
+    /** For income: id of the expense this money refunds (counts as less spent there, not income). */
+    val refundOf: Long? = null,
+    /** Money moved between your own accounts: neither spend nor income. */
+    val isTransfer: Boolean = false,
 )
 
 /** How an expense should count towards averages. */

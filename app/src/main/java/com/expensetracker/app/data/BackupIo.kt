@@ -44,6 +44,7 @@ object BackupIo {
         if (categories != null) append("  \"categories\": ").append(quote(CategoryRegistry.encode(categories))).append(",\n")
         if (goalsText != null) append("  \"goals\": ").append(quote(goalsText)).append(",\n")
         append("  \"expenses\": [")
+        val byId = expenses.associateBy { it.id }
         expenses.forEachIndexed { i, e ->
             append(if (i == 0) "\n    " else ",\n    ")
             append("{\"date\": ").append(quote(e.date.toString()))
@@ -55,12 +56,29 @@ object BackupIo {
             e.spendOverride?.let { append(", \"spendOverride\": ").append(quote(it.name)) }
             e.place?.let { append(", \"place\": ").append(quote(it)) }
             e.goalId?.let { append(", \"goalId\": ").append(quote(it)) }
+            // Ids don't survive a restore, so a refund points at its expense's createdAt.
+            e.refundOf?.let { r -> byId[r]?.let { append(", \"refundOfCreatedAt\": ").append(it.createdAt) } }
+            if (e.isTransfer) append(", \"isTransfer\": true")
             e.time?.let { append(", \"time\": ").append(quote(String.format(java.util.Locale.ROOT, "%02d:%02d", it.hour, it.minute))) }
             if (e.lat != null && e.lon != null) append(", \"lat\": ").append(e.lat).append(", \"lon\": ").append(e.lon)
             append("}")
         }
         if (expenses.isNotEmpty()) append("\n  ")
         append("]\n}\n")
+    }
+
+    /**
+     * After inserting parsed entries ([inserted], whose refundOf holds the target's createdAt) under
+     * [ids], maps each refund's new id to its expense's id among [all] rows. Unmatched = no link.
+     */
+    fun refundLinks(inserted: List<Expense>, ids: List<Long>, all: List<Expense>): Map<Long, Long> {
+        val byCreated = all.filter { !it.isIncome }.associate { it.createdAt to it.id }
+        return buildMap {
+            inserted.forEachIndexed { i, e ->
+                val target = e.refundOf?.let { byCreated[it] } ?: return@forEachIndexed
+                ids.getOrNull(i)?.let { put(it, target) }
+            }
+        }
     }
 
     /** Ids are reset to 0. Throws IllegalArgumentException on malformed input. Kept for old callers; see [parse]. */
@@ -102,6 +120,9 @@ object BackupIo {
                 lon = (o["lon"] as? Number)?.toDouble(),
                 goalId = (o["goalId"] as? String)?.takeIf { it.isNotBlank() },
                 time = (o["time"] as? String)?.let { runCatching { java.time.LocalTime.parse(it) }.getOrNull() },
+                // Holds the target's createdAt until [refundLinks] maps it to a real id after insert.
+                refundOf = (o["refundOfCreatedAt"] as? Number)?.toLong(),
+                isTransfer = o["isTransfer"] as? Boolean ?: false,
             )
         }
         val settingsPatch: ((Settings) -> Settings)? = (root["settings"] as? Map<*, *>)?.let { s ->

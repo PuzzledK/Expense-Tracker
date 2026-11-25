@@ -108,6 +108,13 @@ private data class DraftEdit(
     /** Amount as typed; starts as the parsed amount. */
     val amountText: String,
     val isIncome: Boolean,
+    /** Own-account transfer (neither spend nor income). */
+    val transfer: Boolean = false,
+    /** Expense this income refunds; null = plain income. */
+    val refundOf: Long? = null,
+    val refundLabel: String? = null,
+    /** The matched expense, kept so the chip can be switched back on. */
+    val suggestedRefund: Long? = null,
 )
 
 private fun CapturedPayment.localDateTime(): LocalDateTime =
@@ -119,11 +126,17 @@ private fun predictionFor(p: CapturedPayment): Predictor.Prediction = try {
     Predictor.Prediction(p.payee, Category.OTHER, 0.0)
 }
 
-private fun defaultEdit(p: CapturedPayment, pred: Predictor.Prediction): DraftEdit {
+private fun defaultEdit(p: CapturedPayment, pred: Predictor.Prediction, all: List<Expense>): DraftEdit {
     val at = p.localDateTime()
     val note = pred.note.ifBlank { if (p.payee == "Unknown") "" else p.payee }
-    return DraftEdit(note, pred.category, at.toLocalDate(), at.toLocalTime().withSecond(0).withNano(0), paiseToInput(p.amountPaise), p.isIncome)
+    val g = MoneyMoves.guess(p.rawText, p.payee, p.amountPaise, p.isIncome, at.toLocalDate(), all)
+    return DraftEdit(
+        note, pred.category, at.toLocalDate(), at.toLocalTime().withSecond(0).withNano(0), paiseToInput(p.amountPaise), p.isIncome,
+        transfer = g.transfer, refundOf = g.refundOf?.id, refundLabel = g.refundOf?.let { refundLabel(it) }, suggestedRefund = g.refundOf?.id,
+    )
 }
+
+private fun refundLabel(e: Expense) = "${e.note.ifBlank { e.category.label }} · ${formatRupees(e.amountPaise)} · ${formatDateChip(e.date)}"
 
 private fun isListenerGranted(ctx: Context): Boolean = CaptureListener.granted(ctx)
 
@@ -185,7 +198,8 @@ fun CaptureInboxScreen(vm: ExpenseViewModel, onBack: () -> Unit) {
 
     val predictions = remember(pending) { pending.associate { it.id to predictionFor(it) } }
     val edits = remember { mutableStateMapOf<Long, DraftEdit>() }
-    fun editOf(p: CapturedPayment) = edits[p.id] ?: defaultEdit(p, predictions[p.id] ?: predictionFor(p))
+    val allExpenses by vm.expenses.collectAsState()
+    fun editOf(p: CapturedPayment) = edits[p.id] ?: defaultEdit(p, predictions[p.id] ?: predictionFor(p), allExpenses)
 
     fun confirm(p: CapturedPayment, stamp: Long = System.currentTimeMillis()) {
         val e = editOf(p)
@@ -204,9 +218,11 @@ fun CaptureInboxScreen(vm: ExpenseViewModel, onBack: () -> Unit) {
                 note = note,
                 category = e.category,
                 date = e.date,
-                isIncome = e.isIncome,
+                isIncome = e.isIncome && !e.transfer,
                 createdAt = stamp,
                 time = e.time,
+                isTransfer = e.transfer,
+                refundOf = e.refundOf.takeIf { e.isIncome && !e.transfer },
             ),
             payee = p.payee.takeIf { it != "Unknown" },
         )
@@ -607,8 +623,22 @@ private fun DraftCard(
                 )
             }
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = !edit.isIncome, onClick = { onEdit(edit.copy(isIncome = false)) }, label = { Text("Expense") })
-                FilterChip(selected = edit.isIncome, onClick = { onEdit(edit.copy(isIncome = true)) }, label = { Text("Income") })
+                FilterChip(selected = !edit.isIncome && !edit.transfer, onClick = { onEdit(edit.copy(isIncome = false, transfer = false)) }, label = { Text("Expense") })
+                FilterChip(selected = edit.isIncome && !edit.transfer, onClick = { onEdit(edit.copy(isIncome = true, transfer = false)) }, label = { Text("Income") })
+                FilterChip(selected = edit.transfer, onClick = { onEdit(edit.copy(transfer = !edit.transfer)) }, label = { Text("Transfer") })
+            }
+            if (edit.transfer) {
+                Text(
+                    "Between your own accounts — won't count as spend or income.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (edit.isIncome && edit.refundLabel != null) {
+                FilterChip(
+                    selected = edit.refundOf != null,
+                    onClick = { onEdit(edit.copy(refundOf = if (edit.refundOf != null) null else edit.suggestedRefund)) },
+                    label = { Text("↩ Refund of ${edit.refundLabel}", maxLines = 1) },
+                )
             }
             Spacer(Modifier.height(8.dp))
             val cats = remember { Category.entries }

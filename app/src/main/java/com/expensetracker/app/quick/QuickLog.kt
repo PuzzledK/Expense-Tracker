@@ -55,7 +55,7 @@ object QuickLog {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("quickLogNotification", false)
 
     fun summary(all: List<Expense>, today: LocalDate = LocalDate.now()): Summary {
-        val spend = all.filter { !it.isIncome && it.category != Category.SAVINGS }
+        val spend = com.expensetracker.app.data.Ledger.counted(all).filter { !it.isIncome && it.category != Category.SAVINGS }
         val todays = spend.filter { it.date == today }
         val month = spend.filter { it.date.year == today.year && it.date.month == today.month }
         return Summary(todays.sumOf { it.amountPaise }, todays.size, month.sumOf { it.amountPaise })

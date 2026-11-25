@@ -41,6 +41,10 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
     private val _expenses = MutableStateFlow<List<Expense>>(emptyList())
     val expenses: StateFlow<List<Expense>> = _expenses.asStateFlow()
 
+    /** Entries as they count in totals: transfers out, refunds folded into their expenses (see Ledger). */
+    val counted: StateFlow<List<Expense>> = _expenses.map { com.expensetracker.app.data.Ledger.counted(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     private val _settings = MutableStateFlow(settingsStore.load())
     val settings: StateFlow<Settings> = _settings.asStateFlow()
 
@@ -50,7 +54,7 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Classifier verdict per expense id (income has none). Recomputed whenever data changes. */
-    val spendInfo: StateFlow<Map<Long, SpendInfo>> = _expenses.map { list ->
+    val spendInfo: StateFlow<Map<Long, SpendInfo>> = counted.map { list ->
         withContext(Dispatchers.Default) {
             val verdicts = SpendClassifier.classify(list)
             buildMap { list.forEachIndexed { i, e -> verdicts[i]?.let { put(e.id, it) } } }
@@ -242,7 +246,8 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
                     n == 0
                 }
             }
-            db.insertAll(toInsert.map { it.copy(id = 0) })
+            val ids = db.insertAll(toInsert.map { it.copy(id = 0, refundOf = null) })
+            if (toInsert.any { it.refundOf != null }) db.setRefundLinks(BackupIo.refundLinks(toInsert, ids, db.all()))
             inserted = toInsert.size
         }) {
             // Only the settings a backup carries (budget, reminder, home city); device ones stay.

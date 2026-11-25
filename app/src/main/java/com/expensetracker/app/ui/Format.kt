@@ -145,7 +145,10 @@ fun formatDateChip(date: LocalDate, today: LocalDate = LocalDate.now()): String 
 
 /** True if this expense counts toward "spend" totals given the savings setting. */
 fun Expense.countsAsSpend(excludeSavings: Boolean): Boolean =
-    !isIncome && !(excludeSavings && category == Category.SAVINGS)
+    !isIncome && !isTransfer && !(excludeSavings && category == Category.SAVINGS)
+
+/** True if this entry counts as income in a raw list (transfers and refunds don't; see Ledger). */
+fun Expense.countsAsIncome(): Boolean = isIncome && !isTransfer && refundOf == null
 
 fun YearMonth.contains(date: LocalDate): Boolean = date.year == year && date.month == month
 
@@ -156,7 +159,7 @@ data class SpendSplit(val everyday: Long, val oneOff: Long, val fixed: Long, val
 fun splitSpend(list: List<Expense>, info: Map<Long, SpendInfo>): SpendSplit {
     var everyday = 0L; var oneOff = 0L; var fixed = 0L; var savings = 0L
     list.forEach { e ->
-        if (e.isIncome) return@forEach
+        if (e.isIncome || e.isTransfer) return@forEach
         when (info[e.id]?.type ?: SpendType.EVERYDAY) {
             SpendType.EVERYDAY -> everyday += e.amountPaise
             SpendType.ONE_OFF -> oneOff += e.amountPaise

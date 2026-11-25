@@ -122,6 +122,7 @@ fun HomeScreen(
     onOpenImport: () -> Unit,
 ) {
     val expenses by vm.expenses.collectAsStateWithLifecycle()
+    val counted by vm.counted.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val templates by vm.templates.collectAsStateWithLifecycle()
     val spendInfo by vm.spendInfo.collectAsStateWithLifecycle()
@@ -244,7 +245,7 @@ fun HomeScreen(
             if (searching && q.isNotEmpty()) {
                 item("filters") { ListFilterBar(filter, ::setFilter, expenses) }
                 item("search-summary") {
-                    val total = visible.filter { !it.isIncome }.sumOf { it.amountPaise }
+                    val total = visible.filter { !it.isIncome && !it.isTransfer }.sumOf { it.amountPaise }
                     Text(
                         "${visible.size} matches · ${formatRupees(total)}",
                         style = MaterialTheme.typography.labelLarge,
@@ -257,7 +258,7 @@ fun HomeScreen(
                     MonthSelector(month, onMonthChange, Modifier.padding(horizontal = 4.dp))
                 }
                 item("summary") {
-                    SummaryCard(expenses, month, settings, today, spendInfo)
+                    SummaryCard(counted, month, settings, today, spendInfo)
                 }
                 item("capture") {
                     com.expensetracker.app.capture.CaptureBanner(onOpen = { onOpen(Overlay.CAPTURE) })
@@ -393,7 +394,7 @@ private fun ListFilterBar(filter: ListFilter, onChange: (ListFilter) -> Unit, al
 @Composable
 private fun FilterSummary(list: List<Expense>, filter: ListFilter) {
     val income = filter.kind == KindFilter.INCOME
-    val total = list.filter { it.isIncome == income }.sumOf { it.amountPaise }
+    val total = list.filter { if (income) it.countsAsIncome() else !it.isIncome && !it.isTransfer }.sumOf { it.amountPaise }
     val days = list.mapTo(HashSet()) { it.date }.size
     val perDay = if (!income && days > 0) " · ${formatRupeesWhole(total / days)}/day on days with spend" else ""
     Text(
@@ -621,8 +622,8 @@ private fun QuickAddBar(
 @Composable
 private fun DayHeader(date: LocalDate, items: List<Expense>, today: LocalDate, onAddMore: () -> Unit) {
     val style = LocalAppStyle.current
-    val spent = items.filter { !it.isIncome }.sumOf { it.amountPaise }
-    val income = items.filter { it.isIncome }.sumOf { it.amountPaise }
+    val spent = items.filter { !it.isIncome && !it.isTransfer }.sumOf { it.amountPaise }
+    val income = items.filter { it.countsAsIncome() }.sumOf { it.amountPaise }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -743,8 +744,16 @@ fun ExpenseRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                     )
+                    val tag = when {
+                        expense.isTransfer -> "  ⇄ Transfer"
+                        expense.isIncome && expense.refundOf != null -> "  ↩ Refund"
+                        else -> null
+                    }
+                    if (tag != null) {
+                        Text(tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary, maxLines = 1)
+                    }
                     val t = spend?.type
-                    if (!expense.isIncome && (t == SpendType.ONE_OFF || t == SpendType.FIXED)) {
+                    if (!expense.isIncome && !expense.isTransfer && (t == SpendType.ONE_OFF || t == SpendType.FIXED)) {
                         Text(
                             "  ${t.emoji} ${if (t == SpendType.ONE_OFF) "One-off" else "Fixed"}",
                             style = MaterialTheme.typography.labelSmall,
@@ -755,9 +764,13 @@ fun ExpenseRow(
                 }
             }
             Text(
-                (if (expense.isIncome) "+" else "") + formatRupees(expense.amountPaise),
+                (if (expense.isIncome && !expense.isTransfer) "+" else "") + formatRupees(expense.amountPaise),
                 style = style.money(MaterialTheme.typography.titleMedium),
-                color = if (expense.isIncome) incomeColor() else MaterialTheme.colorScheme.onSurface,
+                color = when {
+                    expense.isTransfer -> MaterialTheme.colorScheme.onSurfaceVariant
+                    expense.isIncome -> incomeColor()
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
             )
         }
         HorizontalDivider(
