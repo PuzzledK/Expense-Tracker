@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">Expenses</string>
     <string name="widget_description">Today’s spend with one-tap logging</string>
+    <string name="widget_budget_description">This month against your budget, and the categories closest to their limits</string>
+    <string name="widget_bills_description">Your next subscriptions and bills, with what they add up to each month</string>
     <string name="quick_log_label">Quick log</string>
     <string name="shortcut_add_short">Add expense</string>
     <string name="shortcut_add_long">Add an expense</string>

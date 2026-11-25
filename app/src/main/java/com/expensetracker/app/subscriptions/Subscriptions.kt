@@ -90,6 +90,7 @@ object Subscriptions {
     fun setHidden(ctx: Context, key: String, hide: Boolean) {
         val now = hidden(ctx).toMutableSet().apply { if (hide) add(key) else remove(key) }
         prefs(ctx).edit { putStringSet(KEY_HIDDEN, now) }
+        com.expensetracker.app.quick.QuickLog.refreshAsync(ctx) // the Upcoming-bills widget
     }
 
     fun remindEnabled(ctx: Context) = prefs(ctx).getBoolean(KEY_REMIND, true)

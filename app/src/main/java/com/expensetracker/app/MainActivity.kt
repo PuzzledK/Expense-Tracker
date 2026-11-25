@@ -27,6 +27,9 @@ class MainActivity : ComponentActivity() {
     private val openBulkRequests = mutableIntStateOf(0)
     /** "Add income" app shortcut: opens the add sheet already switched to income. */
     private val openIncomeRequests = mutableIntStateOf(0)
+    /** Budget widget: switch to Stats / Settings. Counter = how many times asked; value = which tab. */
+    private val openTabRequests = mutableIntStateOf(0)
+    private val openTab = androidx.compose.runtime.mutableStateOf(LaunchRoute.STATS)
     /** Feature screen a notification wants opened (capture review, backup settings). */
     private val overlayRequest = androidx.compose.runtime.mutableStateOf<com.expensetracker.app.ui.Overlay?>(null)
     private val vm: ExpenseViewModel by viewModels()
@@ -69,6 +72,8 @@ class MainActivity : ComponentActivity() {
                             openAddRequests = openAddRequests.intValue,
                             openBulkRequests = openBulkRequests.intValue,
                             openIncomeRequests = openIncomeRequests.intValue,
+                            openTabRequests = openTabRequests.intValue,
+                            openTab = if (openTab.value == LaunchRoute.SETTINGS) com.expensetracker.app.ui.Tab.SETTINGS else com.expensetracker.app.ui.Tab.STATS,
                             overlayRequest = overlayRequest.value,
                             onOverlayRequestHandled = { overlayRequest.value = null },
                         )
@@ -113,6 +118,7 @@ class MainActivity : ComponentActivity() {
             LaunchRoute.BULK -> openBulkRequests.intValue++
             LaunchRoute.REVIEW_CAPTURE -> overlayRequest.value = com.expensetracker.app.ui.Overlay.CAPTURE
             LaunchRoute.BACKUP -> overlayRequest.value = com.expensetracker.app.ui.Overlay.BACKUP
+            LaunchRoute.STATS, LaunchRoute.SETTINGS -> { openTab.value = r; openTabRequests.intValue++ }
         }
         if (intent.getBooleanExtra(com.expensetracker.app.subscriptions.Subscriptions.EXTRA_OPEN, false)) {
             overlayRequest.value = com.expensetracker.app.ui.Overlay.SUBSCRIPTIONS

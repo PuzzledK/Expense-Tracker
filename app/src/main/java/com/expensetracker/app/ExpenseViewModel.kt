@@ -295,7 +295,10 @@ class ExpenseViewModel(app: Application) : AndroidViewModel(app) {
         settingsStore.save(s)
         // Lock hides amounts on the notification/widget, and the widget wears the app's theme,
         // so redraw them when either changes.
-        if (s.appLock != old.appLock || s.themeId != old.themeId || s.darkMode != old.darkMode || s.pureBlack != old.pureBlack) QuickLog.refreshAsync(getApplication())
+        if (s.appLock != old.appLock || s.themeId != old.themeId || s.darkMode != old.darkMode || s.pureBlack != old.pureBlack ||
+            s.monthlyBudgetPaise != old.monthlyBudgetPaise || s.categoryBudgets != old.categoryBudgets ||
+            s.excludeSavingsFromSpend != old.excludeSavingsFromSpend
+        ) QuickLog.refreshAsync(getApplication())
         if (s.captureEnabled && !old.captureEnabled) com.expensetracker.app.capture.CaptureListener.ensureRunning(getApplication())
         if (s.quickLogNotification != old.quickLogNotification) {
             if (s.quickLogNotification) QuickLog.enable(getApplication()) else QuickLog.disable(getApplication())

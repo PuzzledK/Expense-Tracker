@@ -6,7 +6,7 @@ package com.expensetracker.app
  * as strings, notifications as booleans — both count).
  */
 enum class LaunchRoute {
-    ADD_EXPENSE, ADD_INCOME, BULK, REVIEW_CAPTURE, BACKUP;
+    ADD_EXPENSE, ADD_INCOME, BULK, REVIEW_CAPTURE, BACKUP, STATS, SETTINGS;
 
     companion object {
         const val ACTION_ADD = "com.expensetracker.app.action.ADD_EXPENSE"
@@ -18,6 +18,9 @@ enum class LaunchRoute {
         const val EXTRA_OPEN_BULK = "open_bulk"
         const val EXTRA_OPEN_CAPTURE = com.expensetracker.app.capture.CaptureNotifier.EXTRA_OPEN_CAPTURE
         const val EXTRA_OPEN_BACKUP = com.expensetracker.app.backup.AutoBackup.EXTRA_OPEN_BACKUP
+        /** Budget widget: open the Stats tab (or Settings when no budget is set yet). */
+        const val EXTRA_OPEN_STATS = "open_stats"
+        const val EXTRA_OPEN_SETTINGS = "open_settings"
 
         private fun on(v: Any?) = v == true || (v as? String).equals("true", ignoreCase = true)
 
@@ -28,9 +31,11 @@ enum class LaunchRoute {
             if (action == ACTION_BULK || on(extra(EXTRA_OPEN_BULK))) add(BULK)
             if (action == ACTION_REVIEW_CAPTURE || on(extra(EXTRA_OPEN_CAPTURE))) add(REVIEW_CAPTURE)
             if (on(extra(EXTRA_OPEN_BACKUP))) add(BACKUP)
+            if (on(extra(EXTRA_OPEN_STATS))) add(STATS)
+            if (on(extra(EXTRA_OPEN_SETTINGS))) add(SETTINGS)
         }
 
         /** Extras consumed by [of]; removed after handling so a re-delivered intent doesn't replay. */
-        val EXTRAS = listOf(EXTRA_OPEN_ADD, EXTRA_OPEN_BULK, EXTRA_OPEN_CAPTURE, EXTRA_OPEN_BACKUP)
+        val EXTRAS = listOf(EXTRA_OPEN_ADD, EXTRA_OPEN_BULK, EXTRA_OPEN_CAPTURE, EXTRA_OPEN_BACKUP, EXTRA_OPEN_STATS, EXTRA_OPEN_SETTINGS)
     }
 }
