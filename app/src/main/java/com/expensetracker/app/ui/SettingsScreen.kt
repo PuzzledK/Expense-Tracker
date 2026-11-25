@@ -65,6 +65,7 @@ fun SettingsScreen(
     val expenses by vm.expenses.collectAsStateWithLifecycle()
 
     var budgetDialog by remember { mutableStateOf(false) }
+    var categoryBudgetsDialog by remember { mutableStateOf(false) }
     var timeDialog by remember { mutableStateOf(false) }
     var deleteDialog by remember { mutableStateOf(false) }
     var homeCityDialog by remember { mutableStateOf(false) }
@@ -164,6 +165,14 @@ fun SettingsScreen(
                     Text(if (settings.monthlyBudgetPaise > 0) formatRupees(settings.monthlyBudgetPaise) else "Not set — tap to set one")
                 },
                 modifier = Modifier.clickable { budgetDialog = true },
+            )
+            ListItem(
+                headlineContent = { Text("Category budgets") },
+                supportingContent = {
+                    val n = settings.categoryBudgets.size
+                    Text(if (n > 0) "$n ${if (n == 1) "category" else "categories"} · ${formatRupees(settings.categoryBudgets.values.sum())}/month" else "Limits per category, with a nudge at 80% and 100%")
+                },
+                modifier = Modifier.clickable { categoryBudgetsDialog = true },
             )
             ListItem(
                 headlineContent = { Text("Keep savings out of spending") },
@@ -405,6 +414,14 @@ fun SettingsScreen(
                 }) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { budgetDialog = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (categoryBudgetsDialog) {
+        com.expensetracker.app.budget.CategoryBudgetsDialog(
+            current = settings.categoryBudgets,
+            onDismiss = { categoryBudgetsDialog = false },
+            onSave = { m -> vm.updateSettings { it.copy(categoryBudgets = m) }; categoryBudgetsDialog = false },
         )
     }
 

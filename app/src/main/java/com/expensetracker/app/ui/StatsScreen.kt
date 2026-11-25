@@ -199,6 +199,15 @@ fun StatsScreen(
                 }
             }
 
+            val budgets = remember(all, month, excl, settings.categoryBudgets) {
+                com.expensetracker.app.data.CategoryBudgets.progress(settings.categoryBudgets, all, month, excl)
+            }
+            if (budgets.isNotEmpty()) {
+                SectionCard("Category budgets") {
+                    com.expensetracker.app.budget.CategoryBudgetList(budgets, isCurrentMonth = month == YearMonth.from(today))
+                }
+            }
+
             SectionCard("Where it went") {
                 if (byCategory.isEmpty()) {
                     EmptyHint()

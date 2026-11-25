@@ -107,6 +107,7 @@ object QuickLog {
         val s = summary(all)
         if (isEnabled(ctx)) showNotification(ctx, s, status)
         updateWidgets(ctx, s)
+        com.expensetracker.app.budget.BudgetAlerts.check(ctx, all)
     }
 
     fun refreshAsync(ctx: Context, status: String? = null) {
