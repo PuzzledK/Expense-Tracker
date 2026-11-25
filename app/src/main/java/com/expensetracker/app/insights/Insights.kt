@@ -137,6 +137,7 @@ object Insights {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val n = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setColor(com.expensetracker.app.ui.notificationAccent(ctx))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Your week in spending")
             .setContentText(text)

@@ -161,6 +161,7 @@ object QuickLog {
         val monthName = LocalDate.now().month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
 
         val n = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setColor(com.expensetracker.app.ui.notificationAccent(ctx))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(

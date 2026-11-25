@@ -318,6 +318,7 @@ object AutoBackup {
         nm.notify(
             NOTIFICATION_ID,
             NotificationCompat.Builder(ctx, CHANNEL_ID)
+                .setColor(com.expensetracker.app.ui.notificationAccent(ctx))
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("Backups paused — choose the folder again")
                 .setContentText("The app can't reach your backup folder any more.")

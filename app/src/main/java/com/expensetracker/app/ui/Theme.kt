@@ -18,6 +18,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -312,6 +313,25 @@ fun ExpenseTheme(themeId: String? = null, darkMode: Int? = null, content: @Compo
     CompositionLocalProvider(LocalAppStyle provides style) {
         MaterialTheme(colorScheme = scheme, typography = typographyFor(style), shapes = shapesFor(style), content = content)
     }
+}
+
+/**
+ * Accent for notifications, from the saved theme. Android tints the small icon, app name and
+ * action buttons with it (and adjusts contrast for the shade itself).
+ */
+fun notificationAccent(ctx: Context): Int {
+    val prefs = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    val theme = AppThemeId.of(prefs.getString("themeId", null))
+    val dark = when (prefs.getInt("darkMode", DarkMode.SYSTEM)) {
+        DarkMode.LIGHT -> false
+        DarkMode.DARK -> true
+        else -> (ctx.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+    val (scheme, style) = previewColors(theme, dark, ctx)
+    // Neo-brutalism's primary is plain ink; its signature colour is the yellow accent.
+    val c = if (theme == AppThemeId.BRUTAL) style.accent(0) else scheme.primary
+    return c.toArgb()
 }
 
 /** Preview colours for the theme picker (no composition needed). */
