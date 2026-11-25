@@ -248,7 +248,7 @@ fun AddEditSheet(
                 value = note,
                 onValueChange = {
                     note = it
-                    if (!categoryPicked) category = vm.suggestCategory(it)
+                    if (!categoryPicked) category = vm.ruleCategory(it, parsedAmount, isIncome) ?: vm.suggestCategory(it)
                 },
                 label = { Text("Note") },
                 placeholder = { Text("Lunch, Rajma rice") },
