@@ -64,6 +64,8 @@ data class QuickEntry(val amountPaise: Long, val note: String, val isIncome: Boo
 
 data class Settings(
     val monthlyBudgetPaise: Long = 0,           // 0 = no budget
+    /** Monthly limit per category id, in paise (see CategoryBudgets); missing = no limit. */
+    val categoryBudgets: Map<String, Long> = emptyMap(),
     val excludeSavingsFromSpend: Boolean = true,
     val reminderEnabled: Boolean = false,
     val reminderHour: Int = 22,

@@ -9,6 +9,7 @@ class SettingsStore(context: Context) {
 
     fun load() = Settings(
         monthlyBudgetPaise = prefs.getLong("monthlyBudgetPaise", 0),
+        categoryBudgets = CategoryBudgets.decode(prefs.getString("categoryBudgets", "")),
         excludeSavingsFromSpend = prefs.getBoolean("excludeSavingsFromSpend", true),
         reminderEnabled = prefs.getBoolean("reminderEnabled", false),
         reminderHour = prefs.getInt("reminderHour", 22),
@@ -31,6 +32,7 @@ class SettingsStore(context: Context) {
 
     fun save(s: Settings) = prefs.edit {
         putLong("monthlyBudgetPaise", s.monthlyBudgetPaise)
+        putString("categoryBudgets", CategoryBudgets.encode(s.categoryBudgets))
         putBoolean("excludeSavingsFromSpend", s.excludeSavingsFromSpend)
         putBoolean("reminderEnabled", s.reminderEnabled)
         putInt("reminderHour", s.reminderHour)
