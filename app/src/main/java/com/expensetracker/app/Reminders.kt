@@ -102,6 +102,7 @@ class BootReceiver : BroadcastReceiver() {
                 com.expensetracker.app.quick.QuickLog.restore(context)
                 com.expensetracker.app.backup.AutoBackup.restore(context)
                 com.expensetracker.app.insights.Insights.restore(context)
+                com.expensetracker.app.subscriptions.Subscriptions.restore(context)
                 com.expensetracker.app.capture.CaptureListener.ensureRunning(context)
             }
         }

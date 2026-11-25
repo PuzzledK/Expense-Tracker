@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
         // Force-stop clears alarms; re-arm scheduled backups and the weekly summary on every launch.
         com.expensetracker.app.backup.AutoBackup.restore(this)
         com.expensetracker.app.insights.Insights.restore(this)
+        com.expensetracker.app.subscriptions.Subscriptions.restore(this)
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
             val theme = com.expensetracker.app.ui.AppThemeId.of(settings.themeId)
@@ -112,6 +113,10 @@ class MainActivity : ComponentActivity() {
             LaunchRoute.BULK -> openBulkRequests.intValue++
             LaunchRoute.REVIEW_CAPTURE -> overlayRequest.value = com.expensetracker.app.ui.Overlay.CAPTURE
             LaunchRoute.BACKUP -> overlayRequest.value = com.expensetracker.app.ui.Overlay.BACKUP
+        }
+        if (intent.getBooleanExtra(com.expensetracker.app.subscriptions.Subscriptions.EXTRA_OPEN, false)) {
+            overlayRequest.value = com.expensetracker.app.ui.Overlay.SUBSCRIPTIONS
+            intent.removeExtra(com.expensetracker.app.subscriptions.Subscriptions.EXTRA_OPEN)
         }
         LaunchRoute.EXTRAS.forEach(intent::removeExtra)
         // Handled: a re-created activity (rotation, process restore) mustn't replay the shortcut.

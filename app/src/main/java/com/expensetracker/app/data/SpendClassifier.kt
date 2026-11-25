@@ -1,6 +1,5 @@
 package com.expensetracker.app.data
 
-import java.time.YearMonth
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
@@ -30,7 +29,6 @@ object SpendClassifier {
 
     private const val MIN_ONE_OFF = 800_00L          // ₹800
     private const val ALWAYS_ONE_OFF = 5_000_00L     // ₹5,000
-    private const val MIN_RECURRING = 150_00L        // ₹150
     private const val MIN_CATEGORY_SAMPLES = 12
     private const val Z_CUTOFF = 2.5
     private const val MIN_SPREAD = 0.35              // log-scale floor so tight categories don't over-flag
@@ -101,18 +99,7 @@ object SpendClassifier {
 
     /** noteKey → median amount, for notes that recur roughly monthly across 3+ months. */
     private fun recurringKeys(spends: List<Expense>): Map<String, Long> =
-        spends.filter { it.category !in CONSUMABLES }
-            .groupBy { noteKey(it.note) }
-            .filterKeys { it.isNotEmpty() }
-            .mapNotNull { (key, items) ->
-                val months = items.map { YearMonth.from(it.date) }.toSet().size
-                val perMonth = items.size.toDouble() / months
-                val sorted = items.map { it.amountPaise }.sorted()
-                val median = sorted[sorted.size / 2]
-                val steady = sorted.first() > 0 && sorted.last().toDouble() / sorted.first() <= 1.6
-                if (months >= 3 && perMonth <= 1.5 && steady && median >= MIN_RECURRING) key to median else null
-            }
-            .toMap()
+        SubscriptionDetector.recurringGroups(spends).associate { it.key to it.medianPaise }
 
     private fun baseline(amounts: List<Long>): Baseline? {
         if (amounts.size < 5) return null
